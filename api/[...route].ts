@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { handle } from 'hono/vercel'
-import { db } from '../src/db'
+import { db } from '../src/db/index.ts'
 import { sql } from 'drizzle-orm'
 
 export const config = { runtime: 'edge' }
