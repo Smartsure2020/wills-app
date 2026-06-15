@@ -6,8 +6,6 @@ import { db } from "../src/db/index"
 import type { AppEnv } from "../src/server/types"
 import { customersRoute } from "../src/server/routes/customers"
 
-export const config = { runtime: "nodejs" }
-
 const app = new Hono<AppEnv>().basePath("/api")
 
 // CORS — wide-open for now, tighten before launch
