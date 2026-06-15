@@ -1,5 +1,7 @@
 import { Hono } from 'hono'
 import { handle } from 'hono/vercel'
+import { db } from '../src/db'
+import { sql } from 'drizzle-orm'
 
 export const config = { runtime: 'edge' }
 
@@ -13,5 +15,14 @@ app.get('/health', (c) =>
     app: 'wills-app',
   })
 )
+
+app.get('/db-health', async (c) => {
+  try {
+    const result = await db.execute(sql`SELECT current_database() as db, version() as version`)
+    return c.json({ ok: true, result: result[0] })
+  } catch (err) {
+    return c.json({ ok: false, error: String(err) }, 500)
+  }
+})
 
 export default handle(app)
