@@ -5,6 +5,8 @@ import { sql } from "drizzle-orm"
 import { db } from "../src/db/index.js"
 import type { AppEnv } from "../src/server/types.js"
 import { customersRoute } from "../src/server/routes/customers.js"
+import { accountsRoute } from "../src/server/routes/accounts.js"
+import { dataRoute } from "../src/server/routes/data.js"
 
 export const config = { runtime: "nodejs" }
 
@@ -43,8 +45,8 @@ app.get("/db-health", async (c) => {
 
 // ──── Authenticated routes (mounted in Phase 2b onwards) ────
 app.route("/customers", customersRoute)
-// app.route("/accounts", accountsRoute)
-// app.route("/data", dataRoute)
+app.route("/accounts", accountsRoute)
+app.route("/data", dataRoute)
 
 // ──── Catch-all 404 ────
 
