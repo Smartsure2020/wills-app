@@ -1,5 +1,5 @@
 {
-  "buildCommand": "vite build",
+  "buildCommand": "tsc --project tsconfig.server.json && vite build",
   "outputDirectory": "dist",
   "devCommand": "vite --port 3000",
   "framework": null,

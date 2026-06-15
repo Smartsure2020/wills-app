@@ -2,7 +2,7 @@ import { Hono } from "hono"
 import { handle } from "hono/vercel"
 import { cors } from "hono/cors"
 import { sql } from "drizzle-orm"
-import { db } from "../src/db/index"
+import { db } from "../src/db/index.js"
 import type { AppEnv } from "../src/server/types.js"
 import { customersRoute } from "../src/server/routes/customers.js"
 
