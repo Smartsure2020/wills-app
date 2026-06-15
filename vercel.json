@@ -1,0 +1,9 @@
+{
+  "buildCommand": "vite build",
+  "outputDirectory": "dist",
+  "devCommand": "vite --port 3000",
+  "framework": null,
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/[...route]" }
+  ]
+}

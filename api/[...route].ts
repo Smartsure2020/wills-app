@@ -4,6 +4,7 @@ import { cors } from "hono/cors"
 import { sql } from "drizzle-orm"
 import { db } from "../src/db"
 import type { AppEnv } from "../src/server/types"
+import { customersRoute } from "../src/server/customers"
 
 export const config = { runtime: "nodejs" }
 
@@ -41,7 +42,7 @@ app.get("/db-health", async (c) => {
 })
 
 // ──── Authenticated routes (mounted in Phase 2b onwards) ────
-// app.route("/customers", customersRoute)
+app.route("/customers", customersRoute)
 // app.route("/accounts", accountsRoute)
 // app.route("/data", dataRoute)
 
