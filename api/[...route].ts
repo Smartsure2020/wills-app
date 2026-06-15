@@ -3,8 +3,8 @@ import { handle } from "hono/vercel"
 import { cors } from "hono/cors"
 import { sql } from "drizzle-orm"
 import { db } from "../src/db/index"
-import type { AppEnv } from "../src/server/types"
-import { customersRoute } from "../src/server/routes/customers"
+import type { AppEnv } from "../src/server/types.js"
+import { customersRoute } from "../src/server/routes/customers.js"
 
 const app = new Hono<AppEnv>().basePath("/api")
 

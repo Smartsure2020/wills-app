@@ -13,7 +13,7 @@ import {
   sql,
   type SQL,
 } from "drizzle-orm"
-import { db } from "../../db"
+import { db } from "../../db/index.js"
 import {
   account,
   country,
@@ -28,10 +28,10 @@ import {
   relation,
   relationType,
   wishes,
-} from "../../db/schema"
-import { auth } from "../middleware/auth"
-import { paginated, paginationOffset } from "../pagination"
-import type { AppEnv } from "../types"
+} from "../../db/schema.js"
+import { auth } from "../middleware/auth.js"
+import { paginated, paginationOffset } from "../pagination.js"
+import type { AppEnv } from "../types.js"
 
 // ─────────────────────────────────────────────────────────
 // Schemas

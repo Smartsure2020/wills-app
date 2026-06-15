@@ -1,8 +1,8 @@
 import { createMiddleware } from "hono/factory"
 import { eq } from "drizzle-orm"
-import { db } from "../../db"
-import { account } from "../../db/schema"
-import type { AppEnv, AppUser } from "../types"
+import { db } from "../../db/index.js"
+import { account } from "../../db/schema.js"
+import type { AppEnv, AppUser } from "../types.js"
 
 /**
  * Stub auth middleware for development.
