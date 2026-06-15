@@ -4,7 +4,7 @@ import { cors } from "hono/cors"
 import { sql } from "drizzle-orm"
 import { db } from "../src/db"
 import type { AppEnv } from "../src/server/types"
-import { customersRoute } from "../src/server/customers"
+import { customersRoute } from "../src/server/routes/customers"
 
 export const config = { runtime: "nodejs" }
 
