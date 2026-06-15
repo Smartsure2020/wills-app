@@ -37,6 +37,12 @@ import type { AppEnv } from "../types.js"
 // Schemas
 // ─────────────────────────────────────────────────────────
 
+// Zod 4's .uuid() enforces RFC version nibbles, but PostgreSQL accepts any
+// 8-4-4-4-12 hex pattern (including deterministic seed IDs like 00000000-…-0002).
+const pgUuid = z
+  .string()
+  .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, "Invalid UUID")
+
 const relationInputSchema = z.object({
   relationTypeId: z.number().int().min(1),
   title: z.string().max(10).default(""),
@@ -47,7 +53,7 @@ const relationInputSchema = z.object({
 })
 
 const customerCreateSchema = z.object({
-  assignedTo: z.string().uuid(),
+  assignedTo: pgUuid,
   countryId: z.number().int().min(1),
   maritalStatusId: z.number().int().min(1),
   wishesId: z.number().int().min(1),
@@ -84,7 +90,7 @@ const customerTypeaheadSchema = z.object({
 })
 
 const assignBrokerSchema = z.object({
-  userId: z.string().uuid(),
+  userId: pgUuid,
 })
 
 // ─────────────────────────────────────────────────────────
