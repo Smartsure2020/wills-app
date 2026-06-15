@@ -5,6 +5,13 @@ export const config = { runtime: 'edge' }
 
 const app = new Hono().basePath('/api')
 
-app.get('/health', (c) => c.json({ ok: true, ts: Date.now() }))
+app.get('/health', (c) =>
+  c.json({
+    ok: true,
+    ts: Date.now(),
+    runtime: 'edge',
+    app: 'wills-app',
+  })
+)
 
 export default handle(app)
