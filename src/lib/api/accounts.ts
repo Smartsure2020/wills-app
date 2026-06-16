@@ -19,6 +19,24 @@ export type AccountListParams = {
   accountTypeId?: number
 }
 
+export type CreateAccountInput = {
+  accountTypeId: number
+  email: string
+  firstName: string
+  lastName: string
+  contactNumber: string
+  manageAll: boolean
+  customerId?: number
+}
+
+export type UpdateAccountInput = {
+  firstName: string
+  lastName: string
+  email: string
+  contactNumber: string
+  manageAll: boolean
+}
+
 function toQueryString(params: Record<string, unknown>): string {
   const search = new URLSearchParams()
   for (const [key, value] of Object.entries(params)) {
@@ -35,4 +53,10 @@ export const accountsApi = {
     api.get<Paginated<AccountListItem>>(`/accounts${toQueryString(params)}`),
 
   get: (id: string) => api.get<AccountListItem>(`/accounts/${id}`),
+
+  create: (input: CreateAccountInput) =>
+    api.post<{ id: string }>("/accounts", input),
+
+  update: (id: string, input: UpdateAccountInput) =>
+    api.post<{ ok: true }>(`/accounts/${id}`, input),
 }
