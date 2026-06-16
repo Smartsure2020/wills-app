@@ -40,7 +40,7 @@ export const Route = createFileRoute("/customers/new")({
 // ─────────────────────────────────────────────────────────
 
 const relationSchema = z.object({
-  relationTypeId: z.coerce.number().int().min(1, "Required"),
+  relationTypeId: z.number().int().min(1, "Required"),
   title: z.string().max(10),
   firstName: z.string().min(1, "Required").max(100),
   lastName: z.string().min(1, "Required").max(100),
@@ -57,12 +57,12 @@ const customerSchema = z.object({
   dateOfBirth: z.string().min(1, "Required"),
   email: z.string().email("Valid email required"),
   contactNumber: z.string().max(50),
-  countryId: z.coerce.number().int().min(1, "Required"),
-  maritalStatusId: z.coerce.number().int().min(1, "Required"),
-  wishesId: z.coerce.number().int().min(1, "Required"),
+  countryId: z.number().int().min(1, "Required"),
+  maritalStatusId: z.number().int().min(1, "Required"),
+  wishesId: z.number().int().min(1, "Required"),
   occupation: z.string().max(255),
   highestEducation: z.string().max(100),
-  monthlyIncome: z.coerce.number().min(0, "Must be 0 or more"),
+  monthlyIncome: z.number().min(0, "Must be 0 or more"),
   isSmoker: z.boolean(),
   registeredDonor: z.boolean(),
   willDonate: z.boolean(),

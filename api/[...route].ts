@@ -7,6 +7,7 @@ import type { AppEnv } from "../src/server/types.js"
 import { customersRoute } from "../src/server/routes/customers.js"
 import { accountsRoute } from "../src/server/routes/accounts.js"
 import { dataRoute } from "../src/server/routes/data.js"
+import { documentsRoute } from "../src/server/routes/documents.js"
 
 export const config = { runtime: "nodejs" }
 
@@ -47,6 +48,7 @@ app.get("/db-health", async (c) => {
 app.route("/customers", customersRoute)
 app.route("/accounts", accountsRoute)
 app.route("/data", dataRoute)
+app.route("/documents", documentsRoute)
 
 // ──── Catch-all 404 ────
 

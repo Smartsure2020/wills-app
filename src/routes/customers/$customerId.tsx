@@ -1,6 +1,18 @@
+import { useRef, useState, type ChangeEvent } from "react"
 import { createFileRoute, Link } from "@tanstack/react-router"
-import { useQuery } from "@tanstack/react-query"
-import { ArrowLeft, Mail, Phone, Calendar, IdCard } from "lucide-react"
+import { useMutation, useQuery } from "@tanstack/react-query"
+import {
+  ArrowLeft,
+  Mail,
+  Phone,
+  Calendar,
+  IdCard,
+  Upload,
+  FileText,
+  Trash2,
+  Download,
+  Loader2,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -15,7 +27,9 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { customersApi, type CustomerDetail } from "@/lib/api/customers"
-import { formatDate, formatMoney } from "@/lib/format"
+import { documentsApi, uploadDocument, type DocumentItem } from "@/lib/api/documents"
+import { queryClient } from "@/lib/providers"
+import { formatDate, formatDateShort, formatMoney } from "@/lib/format"
 
 export const Route = createFileRoute("/customers/$customerId")({
   component: CustomerProfilePage,
@@ -210,14 +224,7 @@ function CustomerProfile({ customer }: { customer: CustomerDetail }) {
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="border-dashed">
-          <CardHeader>
-            <CardTitle className="text-base">Documents</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            Document tree coming in Phase 3.
-          </CardContent>
-        </Card>
+        <DocumentsCard customerId={customer.id} />
 
         <Card className="border-dashed">
           <CardHeader>
@@ -250,6 +257,169 @@ function CustomerProfileSkeleton() {
         {Array.from({ length: 4 }).map((_, i) => (
           <Skeleton key={i} className="h-32 w-full" />
         ))}
+      </div>
+    </div>
+  )
+}
+
+function DocumentsCard({ customerId }: { customerId: number }) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["documents", customerId],
+    queryFn: () => documentsApi.list(customerId),
+  })
+
+  const uploadMutation = useMutation({
+    mutationFn: (file: File) => uploadDocument(customerId, file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["documents", customerId] })
+      setUploadError(null)
+    },
+    onError: (err) => {
+      setUploadError(err instanceof Error ? err.message : "Upload failed")
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: documentsApi.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["documents", customerId] })
+    },
+  })
+
+  const downloadMutation = useMutation({
+    mutationFn: documentsApi.getDownloadUrl,
+    onSuccess: (data) => {
+      window.open(data.signedUrl, "_blank")
+    },
+  })
+
+  const items = data?.items ?? []
+
+  function onFileChosen(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) uploadMutation.mutate(file)
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="text-base">
+          Documents ({items.length})
+        </CardTitle>
+        <Button
+          size="sm"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploadMutation.isPending}
+        >
+          {uploadMutation.isPending ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Uploading...
+            </>
+          ) : (
+            <>
+              <Upload className="h-4 w-4 mr-2" />
+              Upload
+            </>
+          )}
+        </Button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          onChange={onFileChosen}
+          className="hidden"
+        />
+      </CardHeader>
+
+      <CardContent>
+        {uploadError && (
+          <div className="mb-4 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+            {uploadError}
+          </div>
+        )}
+
+        {isLoading ? (
+          <div className="text-sm text-muted-foreground py-4">Loading...</div>
+        ) : items.length === 0 ? (
+          <div className="text-sm text-muted-foreground text-center py-8 border border-dashed rounded-md">
+            No documents yet. Upload one to get started.
+          </div>
+        ) : (
+          <div className="divide-y">
+            {items.map((doc) => (
+              <DocumentRow
+                key={doc.id}
+                doc={doc}
+                onDownload={() => downloadMutation.mutate(doc.id)}
+                onDelete={() => {
+                  if (confirm(`Delete "${doc.documentName}"?`)) {
+                    deleteMutation.mutate(doc.id)
+                  }
+                }}
+                isDownloading={downloadMutation.isPending && downloadMutation.variables === doc.id}
+                isDeleting={deleteMutation.isPending && deleteMutation.variables === doc.id}
+              />
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function DocumentRow({
+  doc,
+  onDownload,
+  onDelete,
+  isDownloading,
+  isDeleting,
+}: {
+  doc: DocumentItem
+  onDownload: () => void
+  onDelete: () => void
+  isDownloading: boolean
+  isDeleting: boolean
+}) {
+  return (
+    <div className="flex items-center justify-between py-2 px-1">
+      <div className="flex items-center gap-3 min-w-0">
+        <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+        <div className="min-w-0">
+          <div className="text-sm font-medium truncate">{doc.documentName}</div>
+          <div className="text-xs text-muted-foreground">
+            {doc.contentType} · {formatDateShort(doc.createdAt)}
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={onDownload}
+          disabled={isDownloading}
+        >
+          {isDownloading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4" />
+          )}
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={onDelete}
+          disabled={isDeleting}
+        >
+          {isDeleting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Trash2 className="h-4 w-4" />
+          )}
+        </Button>
       </div>
     </div>
   )
