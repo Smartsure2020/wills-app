@@ -1,7 +1,7 @@
 import { Hono } from "hono"
 import { zValidator } from "@hono/zod-validator"
 import { z } from "zod"
-import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm"
+import { and, asc, eq } from "drizzle-orm"
 import { db } from "../../db/index.js"
 import {
   customer,
@@ -49,34 +49,32 @@ async function assertCustomerAccess(
   return { ok: true }
 }
 
-// Lazy-sync: ensure this customer has a FlowControlItem row for every active FlowItem.
+// Lazy-sync: ensure this customer has a FlowItem row for every master FlowControlItem.
 // Idempotent. Cheap (one select + one bulk insert when missing).
-async function syncFlowControlItems(flowControlId: number) {
-  const allActiveItems = await db
-    .select({ id: flowItem.id })
-    .from(flowItem)
-    .where(isNull(flowItem.deletedAt))
+async function syncFlowControlItems(flowControlId: number, flowTypeId: number) {
+  const allTemplates = await db
+    .select({ id: flowControlItem.id, orderBy: flowControlItem.orderBy })
+    .from(flowControlItem)
+    .where(eq(flowControlItem.flowTypeId, flowTypeId))
 
-  if (allActiveItems.length === 0) return
+  if (allTemplates.length === 0) return
 
   const existing = await db
-    .select({ flowItemId: flowControlItem.flowItemId })
-    .from(flowControlItem)
-    .where(eq(flowControlItem.flowControlId, flowControlId))
+    .select({ flowControlItemId: flowItem.flowControlItemId })
+    .from(flowItem)
+    .where(eq(flowItem.flowControlId, flowControlId))
 
-  const existingIds = new Set(existing.map((e) => Number(e.flowItemId)))
-  const missing = allActiveItems
-    .map((i) => Number(i.id))
-    .filter((id) => !existingIds.has(id))
+  const existingIds = new Set(existing.map((e) => Number(e.flowControlItemId)))
+  const missing = allTemplates.filter((item) => !existingIds.has(Number(item.id)))
 
   if (missing.length === 0) return
 
-  await db.insert(flowControlItem).values(
-    missing.map((flowItemId) => ({
+  await db.insert(flowItem).values(
+    missing.map((item) => ({
       flowControlId,
-      flowItemId,
-      state: FLOW_STATES.NOT_STARTED,
-      notes: "",
+      flowControlItemId: item.id,
+      applicable: true,
+      orderBy: item.orderBy,
     }))
   )
 }
@@ -94,7 +92,7 @@ flowControlRoute.get("/", zValidator("query", listSchema), async (c) => {
 
   // Find the customer's FlowControl row (should exist from customer-create)
   const [fc] = await db
-    .select({ id: flowControl.id })
+    .select({ id: flowControl.id, flowTypeId: flowControl.flowTypeId })
     .from(flowControl)
     .where(eq(flowControl.customerId, customerId))
     .limit(1)
@@ -104,40 +102,52 @@ flowControlRoute.get("/", zValidator("query", listSchema), async (c) => {
   }
 
   // Ensure all active items have a corresponding row for this customer
-  await syncFlowControlItems(Number(fc.id))
+  await syncFlowControlItems(Number(fc.id), Number(fc.flowTypeId))
 
   // Now fetch the full checklist with master data + completion info
   const items = await db
     .select({
-      id: flowControlItem.id,
-      flowItemId: flowControlItem.flowItemId,
-      name: flowItem.name,
-      description: flowItem.description,
-      sectionName: flowItem.sectionName,
-      sortOrder: flowItem.sortOrder,
-      state: flowControlItem.state,
-      notes: flowControlItem.notes,
-      completedAt: flowControlItem.completedAt,
+      id: flowItem.id,
+      flowItemId: flowItem.id,
+      name: flowControlItem.abbreviation,
+      description: flowControlItem.description,
+      sectionName: flowControlItem.abbreviation,
+      sortOrder: flowControlItem.orderBy,
+      checkedDate: flowItem.checkedDate,
+      checkedBy: flowItem.checkedBy,
+      applicable: flowItem.applicable,
       completedByFirstName: account.firstName,
       completedByLastName: account.lastName,
     })
-    .from(flowControlItem)
-    .innerJoin(flowItem, eq(flowControlItem.flowItemId, flowItem.id))
-    .leftJoin(account, eq(flowControlItem.completedBy, account.id))
+    .from(flowItem)
+    .innerJoin(flowControlItem, eq(flowItem.flowControlItemId, flowControlItem.id))
+    .leftJoin(account, eq(flowItem.checkedBy, account.id))
     .where(
       and(
-        eq(flowControlItem.flowControlId, fc.id),
-        isNull(flowItem.deletedAt)
+        eq(flowItem.flowControlId, fc.id),
+        eq(flowControlItem.flowTypeId, fc.flowTypeId)
       )
     )
-    .orderBy(asc(flowItem.sectionName), asc(flowItem.sortOrder), asc(flowItem.name))
+    .orderBy(asc(flowControlItem.orderBy), asc(flowControlItem.abbreviation))
 
   return c.json({
     flowControlId: Number(fc.id),
     items: items.map((item) => ({
-      ...item,
       id: Number(item.id),
       flowItemId: Number(item.flowItemId),
+      name: item.name,
+      description: item.description,
+      sectionName: "General",
+      sortOrder: item.sortOrder,
+      state: !item.applicable
+        ? FLOW_STATES.SKIPPED
+        : item.checkedDate
+          ? FLOW_STATES.COMPLETED
+          : FLOW_STATES.NOT_STARTED,
+      notes: "",
+      completedAt: item.checkedDate,
+      completedByFirstName: item.completedByFirstName,
+      completedByLastName: item.completedByLastName,
     })),
   })
 })
@@ -156,13 +166,13 @@ flowControlRoute.post("/items/:id", zValidator("json", updateItemSchema), async 
   // Get the item with its FlowControl + customer for access check
   const [row] = await db
     .select({
-      itemId: flowControlItem.id,
-      flowControlId: flowControlItem.flowControlId,
+      itemId: flowItem.id,
+      flowControlId: flowItem.flowControlId,
       customerId: flowControl.customerId,
     })
-    .from(flowControlItem)
-    .innerJoin(flowControl, eq(flowControlItem.flowControlId, flowControl.id))
-    .where(eq(flowControlItem.id, id))
+    .from(flowItem)
+    .innerJoin(flowControl, eq(flowItem.flowControlId, flowControl.id))
+    .where(eq(flowItem.id, id))
     .limit(1)
 
   if (!row) return c.json({ error: "Item not found" }, 404)
@@ -170,25 +180,14 @@ flowControlRoute.post("/items/:id", zValidator("json", updateItemSchema), async 
   const access = await assertCustomerAccess(row.customerId, user)
   if (!access.ok) return c.json({ error: access.error }, access.status!)
 
-  // Track completion: when moving INTO completed, set completedAt + completedBy
-  // When moving OUT of completed, clear them
-  const updates: Record<string, unknown> = {
-    state: input.state,
-  }
-
-  if (input.notes !== undefined) {
-    updates.notes = input.notes
-  }
-
-  if (input.state === FLOW_STATES.COMPLETED) {
-    updates.completedAt = new Date()
-    updates.completedBy = user.id
-  } else {
-    updates.completedAt = null
-    updates.completedBy = null
-  }
-
-  await db.update(flowControlItem).set(updates).where(eq(flowControlItem.id, id))
+  await db
+    .update(flowItem)
+    .set({
+      applicable: input.state !== FLOW_STATES.SKIPPED,
+      checkedDate: input.state === FLOW_STATES.COMPLETED ? new Date() : null,
+      checkedBy: input.state === FLOW_STATES.COMPLETED ? user.id : null,
+    })
+    .where(eq(flowItem.id, id))
 
   return c.json({ ok: true })
 })

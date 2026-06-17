@@ -3,7 +3,7 @@ import { zValidator } from "@hono/zod-validator"
 import { z } from "zod"
 import { and, asc, eq, isNull } from "drizzle-orm"
 import { db } from "../../db/index.js"
-import { flowItem } from "../../db/schema.js"
+import { flowControlItem, flowType } from "../../db/schema.js"
 import { auth } from "../middleware/auth.js"
 import type { AppEnv, AppUser } from "../types.js"
 
@@ -26,25 +26,24 @@ function assertAdmin(user: AppUser): { ok: boolean; error?: string } {
   return { ok: true }
 }
 
-// GET /api/flow-items — list all active items (any authed user can read)
+// GET /api/flow-items - list all master checklist items (any authed user can read)
 flowItemsRoute.get("/", async (c) => {
   const items = await db
     .select({
-      id: flowItem.id,
-      name: flowItem.name,
-      description: flowItem.description,
-      sectionName: flowItem.sectionName,
-      sortOrder: flowItem.sortOrder,
-      createdAt: flowItem.createdAt,
+      id: flowControlItem.id,
+      name: flowControlItem.abbreviation,
+      description: flowControlItem.description,
+      sectionName: flowType.description,
+      sortOrder: flowControlItem.orderBy,
     })
-    .from(flowItem)
-    .where(isNull(flowItem.deletedAt))
-    .orderBy(asc(flowItem.sortOrder), asc(flowItem.name))
+    .from(flowControlItem)
+    .innerJoin(flowType, eq(flowControlItem.flowTypeId, flowType.id))
+    .orderBy(asc(flowControlItem.orderBy), asc(flowControlItem.abbreviation))
 
   return c.json({ items })
 })
 
-// POST /api/flow-items — create new item (admin only)
+// POST /api/flow-items - create new master checklist item (admin only)
 flowItemsRoute.post("/", zValidator("json", createSchema), async (c) => {
   const user = c.get("user")
   const admin = assertAdmin(user)
@@ -52,19 +51,23 @@ flowItemsRoute.post("/", zValidator("json", createSchema), async (c) => {
 
   const input = c.req.valid("json")
   const [created] = await db
-    .insert(flowItem)
-    .values(input)
+    .insert(flowControlItem)
+    .values({
+      flowTypeId: 1,
+      abbreviation: input.name,
+      description: input.description,
+      orderBy: input.sortOrder,
+    })
     .returning({
-      id: flowItem.id,
-      name: flowItem.name,
-      sectionName: flowItem.sectionName,
-      sortOrder: flowItem.sortOrder,
+      id: flowControlItem.id,
+      name: flowControlItem.abbreviation,
+      sortOrder: flowControlItem.orderBy,
     })
 
   return c.json(created, 201)
 })
 
-// POST /api/flow-items/:id — update (admin only)
+// POST /api/flow-items/:id - update master checklist item (admin only)
 flowItemsRoute.post("/:id", zValidator("json", updateSchema), async (c) => {
   const id = Number(c.req.param("id"))
   if (!Number.isFinite(id)) return c.json({ error: "Invalid id" }, 400)
@@ -76,14 +79,18 @@ flowItemsRoute.post("/:id", zValidator("json", updateSchema), async (c) => {
   const input = c.req.valid("json")
 
   await db
-    .update(flowItem)
-    .set(input)
-    .where(and(eq(flowItem.id, id), isNull(flowItem.deletedAt)))
+    .update(flowControlItem)
+    .set({
+      abbreviation: input.name,
+      description: input.description,
+      orderBy: input.sortOrder,
+    })
+    .where(and(eq(flowControlItem.id, id), eq(flowControlItem.flowTypeId, 1)))
 
   return c.json({ ok: true })
 })
 
-// DELETE /api/flow-items/:id — soft delete (admin only)
+// DELETE /api/flow-items/:id - delete master checklist item (admin only)
 flowItemsRoute.delete("/:id", async (c) => {
   const id = Number(c.req.param("id"))
   if (!Number.isFinite(id)) return c.json({ error: "Invalid id" }, 400)
@@ -92,10 +99,7 @@ flowItemsRoute.delete("/:id", async (c) => {
   const admin = assertAdmin(user)
   if (!admin.ok) return c.json({ error: admin.error }, 403)
 
-  await db
-    .update(flowItem)
-    .set({ deletedAt: new Date() })
-    .where(eq(flowItem.id, id))
+  await db.delete(flowControlItem).where(eq(flowControlItem.id, id))
 
   return c.json({ ok: true })
 })

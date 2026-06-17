@@ -645,10 +645,6 @@ function Step2({ control }: { control: Control<CustomerFormData> }) {
 // Reusable field helpers
 // ─────────────────────────────────────────────────────────
 
-type FieldName =
-  | keyof CustomerFormData
-  | `relations.${number}.${keyof CustomerFormData["relations"][number]}`
-
 function DropdownField({
   control,
   name,

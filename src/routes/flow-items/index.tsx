@@ -35,7 +35,7 @@ const itemSchema = z.object({
   name: z.string().min(1, "Required").max(500),
   description: z.string().max(2000),
   sectionName: z.string().max(200),
-  sortOrder: z.coerce.number().int(),
+  sortOrder: z.number().int(),
 })
 
 type ItemFormData = z.infer<typeof itemSchema>
@@ -189,8 +189,13 @@ function EditItemDialog({
   })
 
   const mutation = useMutation({
-    mutationFn: (data: ItemFormData) =>
-      isNew ? flowItemsApi.create(data) : flowItemsApi.update(item!.id, data),
+    mutationFn: async (data: ItemFormData) => {
+      if (isNew) {
+        await flowItemsApi.create(data)
+      } else {
+        await flowItemsApi.update(item!.id, data)
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["flow-items"] })
       onOpenChange(false)
@@ -261,7 +266,11 @@ function EditItemDialog({
                   <FormItem>
                     <FormLabel>Sort order</FormLabel>
                     <FormControl>
-                      <Input type="number" {...field} />
+                      <Input
+                        type="number"
+                        {...field}
+                        onChange={(e) => field.onChange(e.target.valueAsNumber || 0)}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
