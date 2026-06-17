@@ -29,7 +29,6 @@ export const auth = createMiddleware<AppEnv>(async (c, next) => {
       firstName: account.firstName,
       lastName: account.lastName,
       manageAll: account.manageAll,
-      customerId: account.customerId,
     })
     .from(account)
     .where(eq(account.id, userId))
@@ -45,6 +44,6 @@ export const auth = createMiddleware<AppEnv>(async (c, next) => {
     )
   }
 
-  c.set("user", user as AppUser)
+  c.set("user", { ...user, customerId: null } as AppUser)
   await next()
 })
