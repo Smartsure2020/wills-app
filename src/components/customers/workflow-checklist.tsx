@@ -150,43 +150,50 @@ function ChecklistRow({ item, customerId }: { item: FlowControlItem; customerId:
     : null
 
   return (
-    <div className="flex items-center gap-3 py-2.5 px-3 hover:bg-accent/30">
-      <StateIndicator state={item.state} />
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium">{item.name}</div>
-        {item.description && (
-          <div className="text-xs text-muted-foreground">{item.description}</div>
-        )}
-        {item.state === FLOW_STATES.COMPLETED && item.completedAt && (
-          <div className="text-xs text-muted-foreground mt-0.5">
-            Completed {formatDateShort(item.completedAt)}
-            {completedBy ? ` by ${completedBy}` : ""}
-          </div>
-        )}
+    <div>
+      <div className="flex items-center gap-3 py-2.5 px-3 hover:bg-accent/30">
+        <StateIndicator state={item.state} />
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium">{item.name}</div>
+          {item.description && (
+            <div className="text-xs text-muted-foreground">{item.description}</div>
+          )}
+          {item.state === FLOW_STATES.COMPLETED && item.completedAt && (
+            <div className="text-xs text-muted-foreground mt-0.5">
+              Completed {formatDateShort(item.completedAt)}
+              {completedBy ? ` by ${completedBy}` : ""}
+            </div>
+          )}
+        </div>
+        <div className="flex-shrink-0 flex items-center gap-2">
+          {mutation.isPending && (
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+          )}
+          <Select
+            value={String(item.state)}
+            onValueChange={(v) => mutation.mutate(Number(v) as FlowState)}
+            disabled={mutation.isPending}
+          >
+            <SelectTrigger className="w-44 h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.entries(FLOW_STATE_LABELS) as [string, string][]).map(
+                ([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                )
+              )}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
-      <div className="flex-shrink-0 flex items-center gap-2">
-        {mutation.isPending && (
-          <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-        )}
-        <Select
-          value={String(item.state)}
-          onValueChange={(v) => mutation.mutate(Number(v) as FlowState)}
-          disabled={mutation.isPending}
-        >
-          <SelectTrigger className="w-44 h-8 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {(Object.entries(FLOW_STATE_LABELS) as [string, string][]).map(
-              ([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              )
-            )}
-          </SelectContent>
-        </Select>
-      </div>
+      {mutation.isError && (
+        <div className="px-3 pb-2 text-xs text-destructive">
+          {mutation.error instanceof Error ? mutation.error.message : "Update failed"}
+        </div>
+      )}
     </div>
   )
 }
