@@ -1,5 +1,11 @@
 import { api } from "../api"
 
+export type FlowItemAttachment = {
+  id: number
+  documentId: number
+  documentName: string
+}
+
 export type FlowChecklistItem = {
   id: number
   flowControlId: number
@@ -12,6 +18,8 @@ export type FlowChecklistItem = {
   checkedByFirstName: string | null
   checkedByLastName: string | null
   applicable: boolean
+  notes: string
+  attachments: FlowItemAttachment[]
 }
 
 export type FlowChecklistGroup = {
@@ -30,6 +38,7 @@ export type FlowChecklistResponse = {
 export type UpdateChecklistItemInput = {
   checked?: boolean
   applicable?: boolean
+  notes?: string
 }
 
 export const flowChecklistApi = {
@@ -38,4 +47,14 @@ export const flowChecklistApi = {
 
   updateItem: (id: number, input: UpdateChecklistItemInput) =>
     api.post<{ ok: true }>(`/flow-checklist/items/${id}`, input),
+
+  attachDocument: (itemId: number, documentId: number) =>
+    api.post<{ id: number }>(`/flow-checklist/items/${itemId}/documents`, {
+      documentId,
+    }),
+
+  detachDocument: (itemId: number, documentId: number) =>
+    api.delete<{ ok: true }>(
+      `/flow-checklist/items/${itemId}/documents/${documentId}`
+    ),
 }

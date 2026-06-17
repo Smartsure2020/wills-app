@@ -22,6 +22,10 @@ const allFoldersSchema = z.object({
   customerId: z.coerce.number().int().min(1),
 })
 
+const allFilesSchema = z.object({
+  customerId: z.coerce.number().int().min(1),
+})
+
 const uploadUrlSchema = z.object({
   customerId: z.number().int().min(1),
   parentId: z.number().int().min(0).default(0),
@@ -97,8 +101,37 @@ documentsRoute.get("/folders", zValidator("query", allFoldersSchema), async (c) 
 })
 
 // ─────────────────────────────────────────────────────────
-// GET /api/documents?customerId=X&parentId=Y — list current folder + breadcrumb
+// GET /api/documents/files?customerId=X — all files (for attach dialog)
 // ─────────────────────────────────────────────────────────
+
+documentsRoute.get("/files", zValidator("query", allFilesSchema), async (c) => {
+  const { customerId } = c.req.valid("query")
+  const user = c.get("user")
+
+  const access = await assertCustomerAccess(customerId, user)
+  if (!access.ok) return c.json({ error: access.error }, access.status!)
+
+  const items = await db
+    .select({
+      id: document.id,
+      documentName: document.documentName,
+      contentType: document.contentType,
+      createdAt: document.createdAt,
+    })
+    .from(document)
+    .where(
+      and(
+        eq(document.customerId, customerId),
+        eq(document.isFolder, false),
+        isNull(document.deletedAt)
+      )
+    )
+    .orderBy(asc(document.documentName))
+
+  return c.json({ items })
+})
+
+// GET /api/documents?customerId=X&parentId=Y — list current folder + breadcrumb
 
 documentsRoute.get("/", zValidator("query", listSchema), async (c) => {
   const { customerId, parentId } = c.req.valid("query")

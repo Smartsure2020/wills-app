@@ -1,14 +1,16 @@
 import { Hono } from "hono"
 import { zValidator } from "@hono/zod-validator"
 import { z } from "zod"
-import { asc, eq, sql } from "drizzle-orm"
+import { and, asc, eq, sql } from "drizzle-orm"
 import { db } from "../../db/index.js"
 import {
   account,
   customer,
+  document,
   flowControl,
   flowControlItem,
   flowItem,
+  flowItemDocument,
   flowType,
 } from "../../db/schema.js"
 import { auth } from "../middleware/auth.js"
@@ -21,6 +23,11 @@ const listSchema = z.object({
 const updateItemSchema = z.object({
   checked: z.boolean().optional(),
   applicable: z.boolean().optional(),
+  notes: z.string().max(5000).optional(),
+})
+
+const attachSchema = z.object({
+  documentId: z.number().int().min(1),
 })
 
 export const flowChecklistRoute = new Hono<AppEnv>()
@@ -46,7 +53,6 @@ async function assertCustomerAccess(
   return { ok: true }
 }
 
-// Lazy-sync: ensure every flow_control_item for this flow_type has a corresponding flow_item row
 async function syncFlowItems(flowControlId: number, flowTypeId: number) {
   const masterItems = await db
     .select({ id: flowControlItem.id, orderBy: flowControlItem.orderBy })
@@ -70,12 +76,16 @@ async function syncFlowItems(flowControlId: number, flowTypeId: number) {
       flowControlId,
       flowControlItemId: m.id,
       applicable: true,
+      notes: "",
       orderBy: m.orderBy,
     }))
   )
 }
 
+// ─────────────────────────────────────────────────────────
 // GET /api/flow-checklist?customerId=X
+// ─────────────────────────────────────────────────────────
+
 flowChecklistRoute.get("/", zValidator("query", listSchema), async (c) => {
   const { customerId } = c.req.valid("query")
   const user = c.get("user")
@@ -83,7 +93,6 @@ flowChecklistRoute.get("/", zValidator("query", listSchema), async (c) => {
   const access = await assertCustomerAccess(customerId, user)
   if (!access.ok) return c.json({ error: access.error }, access.status!)
 
-  // Fetch all flow_controls for this customer with their flow_type names
   const flowControls = await db
     .select({
       id: flowControl.id,
@@ -100,12 +109,10 @@ flowChecklistRoute.get("/", zValidator("query", listSchema), async (c) => {
     return c.json({ flowControls: [] })
   }
 
-  // Lazy-sync items for each flow_control
   await Promise.all(
     flowControls.map((fc) => syncFlowItems(fc.id, fc.flowTypeId))
   )
 
-  // Fetch all flow_items for these flow_controls with master + checker info
   const fcIds = flowControls.map((fc) => fc.id)
   const items = await db
     .select({
@@ -120,6 +127,7 @@ flowChecklistRoute.get("/", zValidator("query", listSchema), async (c) => {
       checkedByFirstName: account.firstName,
       checkedByLastName: account.lastName,
       applicable: flowItem.applicable,
+      notes: flowItem.notes,
     })
     .from(flowItem)
     .innerJoin(flowControlItem, eq(flowItem.flowControlItemId, flowControlItem.id))
@@ -127,16 +135,53 @@ flowChecklistRoute.get("/", zValidator("query", listSchema), async (c) => {
     .where(sql`${flowItem.flowControlId} IN (${sql.join(fcIds.map((id) => sql`${id}`), sql`, `)})`)
     .orderBy(asc(flowItem.orderBy), asc(flowItem.id))
 
-  // Group items by flow_control
+  // Fetch all attachments for these flow items in one go
+  const flowItemIds = items.map((i) => i.id)
+  const attachments =
+    flowItemIds.length === 0
+      ? []
+      : await db
+          .select({
+            id: flowItemDocument.id,
+            flowItemId: flowItemDocument.flowItemId,
+            documentId: flowItemDocument.documentId,
+            documentName: document.documentName,
+          })
+          .from(flowItemDocument)
+          .innerJoin(document, eq(flowItemDocument.documentId, document.id))
+          .where(
+            sql`${flowItemDocument.flowItemId} IN (${sql.join(flowItemIds.map((id) => sql`${id}`), sql`, `)})`
+          )
+
+  // Index attachments by flowItemId
+  const attachmentsByItem = new Map<number, typeof attachments>()
+  for (const a of attachments) {
+    const arr = attachmentsByItem.get(a.flowItemId) ?? []
+    arr.push(a)
+    attachmentsByItem.set(a.flowItemId, arr)
+  }
+
+  const itemsWithAttachments = items.map((item) => ({
+    ...item,
+    attachments: (attachmentsByItem.get(item.id) ?? []).map((a) => ({
+      id: a.id,
+      documentId: Number(a.documentId),
+      documentName: a.documentName,
+    })),
+  }))
+
   const result = flowControls.map((fc) => ({
     ...fc,
-    items: items.filter((i) => i.flowControlId === fc.id),
+    items: itemsWithAttachments.filter((i) => i.flowControlId === fc.id),
   }))
 
   return c.json({ flowControls: result })
 })
 
-// POST /api/flow-checklist/items/:id — toggle checked or applicable
+// ─────────────────────────────────────────────────────────
+// POST /api/flow-checklist/items/:id — checked, applicable, notes
+// ─────────────────────────────────────────────────────────
+
 flowChecklistRoute.post("/items/:id", zValidator("json", updateItemSchema), async (c) => {
   const id = Number(c.req.param("id"))
   if (!Number.isFinite(id)) return c.json({ error: "Invalid id" }, 400)
@@ -144,7 +189,6 @@ flowChecklistRoute.post("/items/:id", zValidator("json", updateItemSchema), asyn
   const input = c.req.valid("json")
   const user = c.get("user")
 
-  // Verify access via the flow_control → customer chain
   const [row] = await db
     .select({
       itemId: flowItem.id,
@@ -172,11 +216,14 @@ flowChecklistRoute.post("/items/:id", zValidator("json", updateItemSchema), asyn
 
   if (input.applicable !== undefined) {
     updates.applicable = input.applicable
-    // If marking as not applicable, also clear checked state
     if (!input.applicable) {
       updates.checkedDate = null
       updates.checkedBy = null
     }
+  }
+
+  if (input.notes !== undefined) {
+    updates.notes = input.notes
   }
 
   if (Object.keys(updates).length === 0) {
@@ -184,6 +231,105 @@ flowChecklistRoute.post("/items/:id", zValidator("json", updateItemSchema), asyn
   }
 
   await db.update(flowItem).set(updates).where(eq(flowItem.id, id))
+
+  return c.json({ ok: true })
+})
+
+// ─────────────────────────────────────────────────────────
+// POST /api/flow-checklist/items/:id/documents — attach a document
+// ─────────────────────────────────────────────────────────
+
+flowChecklistRoute.post(
+  "/items/:id/documents",
+  zValidator("json", attachSchema),
+  async (c) => {
+    const id = Number(c.req.param("id"))
+    if (!Number.isFinite(id)) return c.json({ error: "Invalid id" }, 400)
+
+    const { documentId } = c.req.valid("json")
+    const user = c.get("user")
+
+    // Verify item exists, get its customer
+    const [item] = await db
+      .select({ customerId: flowControl.customerId })
+      .from(flowItem)
+      .innerJoin(flowControl, eq(flowItem.flowControlId, flowControl.id))
+      .where(eq(flowItem.id, id))
+      .limit(1)
+
+    if (!item) return c.json({ error: "Item not found" }, 404)
+
+    const access = await assertCustomerAccess(item.customerId, user)
+    if (!access.ok) return c.json({ error: access.error }, access.status!)
+
+    // Verify the document belongs to the same customer
+    const [doc] = await db
+      .select({ customerId: document.customerId, isFolder: document.isFolder })
+      .from(document)
+      .where(eq(document.id, documentId))
+      .limit(1)
+
+    if (!doc) return c.json({ error: "Document not found" }, 404)
+    if (doc.customerId !== item.customerId)
+      return c.json({ error: "Document belongs to a different customer" }, 400)
+    if (doc.isFolder)
+      return c.json({ error: "Cannot attach a folder" }, 400)
+
+    // Check if already attached
+    const [existing] = await db
+      .select({ id: flowItemDocument.id })
+      .from(flowItemDocument)
+      .where(
+        and(
+          eq(flowItemDocument.flowItemId, id),
+          eq(flowItemDocument.documentId, documentId)
+        )
+      )
+      .limit(1)
+
+    if (existing) return c.json({ error: "Already attached" }, 409)
+
+    const [created] = await db
+      .insert(flowItemDocument)
+      .values({ flowItemId: id, documentId })
+      .returning({ id: flowItemDocument.id })
+
+    return c.json(created, 201)
+  }
+)
+
+// ─────────────────────────────────────────────────────────
+// DELETE /api/flow-checklist/items/:itemId/documents/:documentId
+// ─────────────────────────────────────────────────────────
+
+flowChecklistRoute.delete("/items/:itemId/documents/:documentId", async (c) => {
+  const itemId = Number(c.req.param("itemId"))
+  const documentId = Number(c.req.param("documentId"))
+  if (!Number.isFinite(itemId) || !Number.isFinite(documentId))
+    return c.json({ error: "Invalid id" }, 400)
+
+  const user = c.get("user")
+
+  const [item] = await db
+    .select({ customerId: flowControl.customerId })
+    .from(flowItem)
+    .innerJoin(flowControl, eq(flowItem.flowControlId, flowControl.id))
+    .where(eq(flowItem.id, itemId))
+    .limit(1)
+
+  if (!item) return c.json({ error: "Item not found" }, 404)
+
+  const access = await assertCustomerAccess(item.customerId, user)
+  if (!access.ok) return c.json({ error: access.error }, access.status!)
+
+  await db
+    .delete(flowItemDocument)
+    .where(
+      and(
+        eq(flowItemDocument.flowItemId, itemId),
+        eq(flowItemDocument.documentId, documentId)
+      )
+    )
 
   return c.json({ ok: true })
 })

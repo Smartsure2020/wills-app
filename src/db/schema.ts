@@ -219,6 +219,7 @@ export const flowItem = pgTable(
     checkedDate: timestamp("checked_date"),
     checkedBy: uuid("checked_by").references(() => account.id),
     applicable: boolean("applicable").notNull().default(true),
+    notes: text("notes").notNull().default(""),
     orderBy: integer("order_by").notNull(),
   },
   (t) => ({

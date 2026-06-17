@@ -23,6 +23,13 @@ export type FolderItem = {
   documentName: string
 }
 
+export type CustomerFile = {
+  id: number
+  documentName: string
+  contentType: string
+  createdAt: string
+}
+
 export type UploadUrlResponse = {
   documentId: number
   documentName: string
@@ -45,6 +52,9 @@ export const documentsApi = {
 
   listFolders: (customerId: number) =>
     api.get<{ folders: FolderItem[] }>(`/documents/folders?customerId=${customerId}`),
+
+  listAllFiles: (customerId: number) =>
+    api.get<{ items: CustomerFile[] }>(`/documents/files?customerId=${customerId}`),
 
   createUploadUrl: (input: {
     customerId: number

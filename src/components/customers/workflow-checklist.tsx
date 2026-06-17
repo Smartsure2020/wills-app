@@ -1,13 +1,38 @@
+import { useMemo, useState } from "react"
 import { useMutation, useQuery } from "@tanstack/react-query"
-import { Check, Loader2, AlertCircle, MinusCircle, RotateCcw } from "lucide-react"
+import {
+  Check,
+  Loader2,
+  AlertCircle,
+  MinusCircle,
+  RotateCcw,
+  ChevronDown,
+  ChevronRight,
+  Paperclip,
+  X,
+  FileText,
+  StickyNote,
+  Plus,
+} from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   flowChecklistApi,
   type FlowChecklistItem,
   type FlowChecklistGroup,
 } from "@/lib/api/flow-checklist"
+import { documentsApi } from "@/lib/api/documents"
 import { queryClient } from "@/lib/providers"
 import { formatDateShort } from "@/lib/format"
 
@@ -63,9 +88,7 @@ export function WorkflowChecklist({ customerId }: Props) {
             <div>
               <div className="font-medium">No flow control records</div>
               <p className="text-muted-foreground mt-1">
-                This customer has no flow_control rows. The customer-create logic
-                normally creates one — if this is an older customer, you may need to
-                create one manually via SQL.
+                This customer has no flow_control rows.
               </p>
             </div>
           </div>
@@ -124,7 +147,7 @@ function FlowControlGroup({
       <CardContent>
         {group.items.length === 0 ? (
           <div className="text-sm text-muted-foreground text-center py-6 border border-dashed rounded-md">
-            No items configured for this flow type. Admins can add them at{" "}
+            No items configured for this flow type. Add them at{" "}
             <code className="text-xs bg-muted px-1 py-0.5 rounded">/flow-items</code>.
           </div>
         ) : (
@@ -146,16 +169,21 @@ function ChecklistRow({
   item: FlowChecklistItem
   customerId: number
 }) {
-  const mutation = useMutation({
+  const [expanded, setExpanded] = useState(false)
+  const [attachOpen, setAttachOpen] = useState(false)
+
+  const isChecked = !!item.checkedDate
+  const isNotApplicable = !item.applicable
+  const hasNotes = item.notes.length > 0
+  const hasAttachments = item.attachments.length > 0
+
+  const stateMutation = useMutation({
     mutationFn: (input: { checked?: boolean; applicable?: boolean }) =>
       flowChecklistApi.updateItem(item.id, input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["flow-checklist", customerId] })
     },
   })
-
-  const isChecked = !!item.checkedDate
-  const isNotApplicable = !item.applicable
 
   const checkedByName = item.checkedByFirstName
     ? `${item.checkedByFirstName} ${item.checkedByLastName ?? ""}`.trim()
@@ -166,8 +194,21 @@ function ChecklistRow({
       <div className="flex items-center gap-3 py-2.5 px-3 hover:bg-accent/30">
         <button
           type="button"
-          onClick={() => mutation.mutate({ checked: !isChecked })}
-          disabled={mutation.isPending || isNotApplicable}
+          onClick={() => setExpanded((v) => !v)}
+          className="text-muted-foreground hover:text-foreground flex-shrink-0"
+          title={expanded ? "Collapse" : "Expand"}
+        >
+          {expanded ? (
+            <ChevronDown className="h-4 w-4" />
+          ) : (
+            <ChevronRight className="h-4 w-4" />
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => stateMutation.mutate({ checked: !isChecked })}
+          disabled={stateMutation.isPending || isNotApplicable}
           className={`h-5 w-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
             isNotApplicable
               ? "bg-muted border-muted-foreground/30 cursor-not-allowed opacity-50"
@@ -175,19 +216,12 @@ function ChecklistRow({
               ? "bg-green-500 border-green-600 hover:bg-green-600"
               : "border-muted-foreground/40 hover:border-foreground"
           }`}
-          title={
-            isNotApplicable
-              ? "Marked not applicable"
-              : isChecked
-              ? "Click to uncheck"
-              : "Click to mark complete"
-          }
         >
           {isChecked && !isNotApplicable && <Check className="h-3 w-3 text-white" />}
         </button>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
               {item.abbreviation}
             </span>
@@ -198,6 +232,15 @@ function ChecklistRow({
             >
               {item.description}
             </span>
+            {hasNotes && (
+              <StickyNote className="h-3 w-3 text-amber-600" />
+            )}
+            {hasAttachments && (
+              <span className="inline-flex items-center gap-0.5 text-xs text-muted-foreground">
+                <Paperclip className="h-3 w-3" />
+                {item.attachments.length}
+              </span>
+            )}
           </div>
           {isChecked && item.checkedDate && (
             <div className="text-xs text-muted-foreground mt-0.5">
@@ -208,16 +251,15 @@ function ChecklistRow({
         </div>
 
         <div className="flex items-center gap-1 flex-shrink-0">
-          {mutation.isPending && (
+          {stateMutation.isPending && (
             <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
           )}
           {isNotApplicable ? (
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => mutation.mutate({ applicable: true })}
-              disabled={mutation.isPending}
-              title="Mark applicable"
+              onClick={() => stateMutation.mutate({ applicable: true })}
+              disabled={stateMutation.isPending}
               className="h-7 text-xs"
             >
               <RotateCcw className="h-3.5 w-3.5 mr-1" />
@@ -227,9 +269,8 @@ function ChecklistRow({
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => mutation.mutate({ applicable: false })}
-              disabled={mutation.isPending}
-              title="Mark not applicable"
+              onClick={() => stateMutation.mutate({ applicable: false })}
+              disabled={stateMutation.isPending}
               className="h-7 text-xs"
             >
               <MinusCircle className="h-3.5 w-3.5 mr-1" />
@@ -238,11 +279,233 @@ function ChecklistRow({
           )}
         </div>
       </div>
-      {mutation.isError && (
-        <div className="px-3 pb-2 text-xs text-destructive">
-          {mutation.error instanceof Error ? mutation.error.message : "Update failed"}
-        </div>
+
+      {expanded && (
+        <ExpandedDetails
+          item={item}
+          customerId={customerId}
+          onAttachClick={() => setAttachOpen(true)}
+        />
       )}
+
+      <AttachDocumentDialog
+        open={attachOpen}
+        onOpenChange={setAttachOpen}
+        item={item}
+        customerId={customerId}
+      />
     </div>
+  )
+}
+
+function ExpandedDetails({
+  item,
+  customerId,
+  onAttachClick,
+}: {
+  item: FlowChecklistItem
+  customerId: number
+  onAttachClick: () => void
+}) {
+  const [notes, setNotes] = useState(item.notes)
+  const [savedNotes, setSavedNotes] = useState(item.notes)
+
+  const notesMutation = useMutation({
+    mutationFn: (newNotes: string) =>
+      flowChecklistApi.updateItem(item.id, { notes: newNotes }),
+    onSuccess: (_, newNotes) => {
+      setSavedNotes(newNotes)
+      queryClient.invalidateQueries({ queryKey: ["flow-checklist", customerId] })
+    },
+  })
+
+  const detachMutation = useMutation({
+    mutationFn: (documentId: number) =>
+      flowChecklistApi.detachDocument(item.id, documentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["flow-checklist", customerId] })
+    },
+  })
+
+  function saveNotes() {
+    if (notes !== savedNotes) {
+      notesMutation.mutate(notes)
+    }
+  }
+
+  return (
+    <div className="bg-muted/30 border-t px-12 py-3 space-y-3">
+      <div>
+        <div className="flex items-center gap-2 mb-1.5">
+          <StickyNote className="h-3.5 w-3.5 text-muted-foreground" />
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            Notes
+          </label>
+          {notesMutation.isPending && (
+            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+          )}
+          {!notesMutation.isPending && notes !== savedNotes && (
+            <span className="text-xs text-muted-foreground">unsaved</span>
+          )}
+        </div>
+        <Textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          onBlur={saveNotes}
+          placeholder="Add notes for this item…"
+          rows={2}
+          className="text-sm bg-background"
+        />
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center gap-2">
+            <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Attachments ({item.attachments.length})
+            </label>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onAttachClick}
+            className="h-7 text-xs"
+          >
+            <Plus className="h-3 w-3 mr-1" />
+            Attach
+          </Button>
+        </div>
+        {item.attachments.length === 0 ? (
+          <p className="text-xs text-muted-foreground italic">
+            No documents attached yet.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {item.attachments.map((att) => (
+              <div
+                key={att.id}
+                className="inline-flex items-center gap-1.5 bg-background border rounded-md px-2 py-1 text-xs"
+              >
+                <FileText className="h-3 w-3 text-muted-foreground" />
+                <span className="truncate max-w-[200px]">{att.documentName}</span>
+                <button
+                  type="button"
+                  onClick={() => detachMutation.mutate(att.documentId)}
+                  disabled={detachMutation.isPending}
+                  className="text-muted-foreground hover:text-destructive ml-1"
+                  title="Remove attachment"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function AttachDocumentDialog({
+  open,
+  onOpenChange,
+  item,
+  customerId,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  item: FlowChecklistItem
+  customerId: number
+}) {
+  const [search, setSearch] = useState("")
+
+  const { data } = useQuery({
+    queryKey: ["documents", customerId, "all-files"],
+    queryFn: () => documentsApi.listAllFiles(customerId),
+    enabled: open,
+  })
+
+  const attachMutation = useMutation({
+    mutationFn: (documentId: number) =>
+      flowChecklistApi.attachDocument(item.id, documentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["flow-checklist", customerId] })
+      onOpenChange(false)
+      setSearch("")
+    },
+  })
+
+  const files = data?.items ?? []
+  const attachedIds = new Set(item.attachments.map((a) => a.documentId))
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim()
+    if (!q) return files
+    return files.filter((f) => f.documentName.toLowerCase().includes(q))
+  }, [files, search])
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Attach a document</DialogTitle>
+          <DialogDescription>
+            Link an existing customer document to "{item.description}".
+          </DialogDescription>
+        </DialogHeader>
+
+        <Input
+          placeholder="Search documents…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          autoFocus
+        />
+
+        <div className="max-h-72 overflow-auto border rounded-md divide-y">
+          {filtered.length === 0 ? (
+            <div className="text-sm text-muted-foreground text-center py-8">
+              {files.length === 0
+                ? "No documents uploaded for this customer yet."
+                : `No documents match "${search}"`}
+            </div>
+          ) : (
+            filtered.map((file) => {
+              const alreadyAttached = attachedIds.has(file.id)
+              return (
+                <button
+                  key={file.id}
+                  type="button"
+                  onClick={() => attachMutation.mutate(file.id)}
+                  disabled={alreadyAttached || attachMutation.isPending}
+                  className="w-full flex items-center gap-3 py-2 px-3 hover:bg-accent/30 disabled:opacity-50 disabled:cursor-not-allowed text-left"
+                >
+                  <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">
+                      {file.documentName}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {file.contentType} · {formatDateShort(file.createdAt)}
+                    </div>
+                  </div>
+                  {alreadyAttached && (
+                    <span className="text-xs text-muted-foreground flex-shrink-0">
+                      Already attached
+                    </span>
+                  )}
+                </button>
+              )
+            })
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
