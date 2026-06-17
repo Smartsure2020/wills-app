@@ -1,9 +1,9 @@
 import { Hono } from "hono"
 import { zValidator } from "@hono/zod-validator"
 import { z } from "zod"
-import { and, asc, eq, isNull } from "drizzle-orm"
+import { and, asc, eq, inArray } from "drizzle-orm"
 import { db } from "../../db/index.js"
-import { flowControlItem, flowType } from "../../db/schema.js"
+import { flowControlItem, flowItem, flowItemDocument, flowType } from "../../db/schema.js"
 import { auth } from "../middleware/auth.js"
 import type { AppEnv, AppUser } from "../types.js"
 
@@ -99,7 +99,22 @@ flowItemsRoute.delete("/:id", async (c) => {
   const admin = assertAdmin(user)
   if (!admin.ok) return c.json({ error: admin.error }, 403)
 
-  await db.delete(flowControlItem).where(eq(flowControlItem.id, id))
+  await db.transaction(async (tx) => {
+    const rows = await tx
+      .select({ id: flowItem.id })
+      .from(flowItem)
+      .where(eq(flowItem.flowControlItemId, id))
+
+    const flowItemIds = rows.map((row) => row.id)
+    if (flowItemIds.length > 0) {
+      await tx.delete(flowItemDocument).where(inArray(flowItemDocument.flowItemId, flowItemIds))
+      await tx.delete(flowItem).where(inArray(flowItem.id, flowItemIds))
+    }
+
+    await tx
+      .delete(flowControlItem)
+      .where(and(eq(flowControlItem.id, id), eq(flowControlItem.flowTypeId, 1)))
+  })
 
   return c.json({ ok: true })
 })

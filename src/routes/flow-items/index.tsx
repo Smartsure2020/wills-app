@@ -323,9 +323,8 @@ function DeleteItemDialog({
           <DialogTitle>Delete "{target?.name}"?</DialogTitle>
           <DialogDescription>
             This item will be removed from the master list. Existing customer
-            checklists will keep their progress on this item, but it will no longer
-            appear on new fetches. Existing notes and completion records are
-            preserved in the database.
+            checklists will also remove this item, including any completion records
+            attached to it.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
