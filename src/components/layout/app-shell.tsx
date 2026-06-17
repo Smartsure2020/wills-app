@@ -2,7 +2,6 @@ import { Link } from "@tanstack/react-router"
 import { useAuth } from "@/lib/providers"
 import { cn } from "@/lib/utils"
 import type { ReactNode } from "react"
-import { Home, Users, UserCog, FileText, ListChecks, Settings } from "lucide-react"
 import { Home, Users, UserCog, FileText, ListChecks, Mail, Settings } from "lucide-react"
 
 type NavItem = {

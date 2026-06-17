@@ -283,6 +283,11 @@ flowChecklistRoute.post("/items/:id", zValidator("json", updateItemSchema), asyn
 
   await db.update(flowItem).set(updates).where(eq(flowItem.id, id))
 
+  // Queue email if item just transitioned to checked
+  if (input.checked === true) {
+    await queueEmailIfTemplateExists(id)
+  }
+
   return c.json({ ok: true })
 })
 
