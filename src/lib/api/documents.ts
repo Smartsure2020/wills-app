@@ -11,6 +11,18 @@ export type DocumentItem = {
   createdBy: string | null
 }
 
+export type Breadcrumb = {
+  id: number
+  parentId: number
+  documentName: string
+}
+
+export type FolderItem = {
+  id: number
+  parentId: number
+  documentName: string
+}
+
 export type UploadUrlResponse = {
   documentId: number
   documentName: string
@@ -26,14 +38,29 @@ export type DownloadUrlResponse = {
 }
 
 export const documentsApi = {
-  list: (customerId: number) =>
-    api.get<{ items: DocumentItem[] }>(`/documents?customerId=${customerId}`),
+  list: (customerId: number, parentId: number = 0) =>
+    api.get<{ items: DocumentItem[]; breadcrumbs: Breadcrumb[] }>(
+      `/documents?customerId=${customerId}&parentId=${parentId}`
+    ),
+
+  listFolders: (customerId: number) =>
+    api.get<{ folders: FolderItem[] }>(`/documents/folders?customerId=${customerId}`),
 
   createUploadUrl: (input: {
     customerId: number
+    parentId: number
     documentName: string
     contentType: string
   }) => api.post<UploadUrlResponse>("/documents/upload-url", input),
+
+  createFolder: (input: {
+    customerId: number
+    parentId: number
+    folderName: string
+  }) => api.post<{ id: number; parentId: number; documentName: string; isFolder: boolean }>("/documents/folder", input),
+
+  move: (id: number, newParentId: number) =>
+    api.post<{ ok: true }>(`/documents/${id}/move`, { newParentId }),
 
   getDownloadUrl: (id: number) =>
     api.get<DownloadUrlResponse>(`/documents/${id}/download-url`),
@@ -41,19 +68,18 @@ export const documentsApi = {
   delete: (id: number) => api.delete<{ ok: true }>(`/documents/${id}`),
 }
 
-// ─────────────────────────────────────────────────────────
-// Upload helper: orchestrates the two-step upload flow
-// ─────────────────────────────────────────────────────────
-
-export async function uploadDocument(customerId: number, file: File): Promise<DocumentItem> {
-  // 1. Get signed upload URL
+export async function uploadDocument(
+  customerId: number,
+  parentId: number,
+  file: File
+): Promise<DocumentItem> {
   const init = await documentsApi.createUploadUrl({
     customerId,
+    parentId,
     documentName: file.name,
     contentType: file.type || "application/octet-stream",
   })
 
-  // 2. PUT the file directly to Supabase Storage using the signed URL
   const uploadRes = await fetch(init.signedUrl, {
     method: "PUT",
     headers: {
@@ -67,10 +93,9 @@ export async function uploadDocument(customerId: number, file: File): Promise<Do
     throw new Error(`Upload failed: ${uploadRes.status} ${uploadRes.statusText}`)
   }
 
-  // Return a shape matching DocumentItem so the UI can show it immediately
   return {
     id: init.documentId,
-    parentId: 0,
+    parentId,
     customerId,
     documentName: init.documentName,
     isFolder: false,
