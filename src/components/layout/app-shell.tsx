@@ -1,5 +1,4 @@
 import { Link } from "@tanstack/react-router"
-import { Home, Users, UserCog, FileText, Settings } from "lucide-react"
 import { useAuth } from "@/lib/providers"
 import { cn } from "@/lib/utils"
 import type { ReactNode } from "react"
