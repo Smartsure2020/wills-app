@@ -301,12 +301,15 @@ export const mail = pgTable(
     address: varchar("address", { length: 255 }).notNull(),
     subject: varchar("subject", { length: 500 }).notNull(),
     body: text("body").notNull(),
+    customerId: integer("customer_id").references(() => customer.id),
     createdAt: timestamp("created_at").notNull().defaultNow(),
+    sentAt: timestamp("sent_at"),
     attempts: integer("attempts").notNull().default(0),
     lastError: text("last_error"),
   },
   (t) => ({
     createdAtIdx: index("mail_created_at_idx").on(t.createdAt),
+    sentAtIdx: index("mail_sent_at_idx").on(t.sentAt),
   })
 )
 

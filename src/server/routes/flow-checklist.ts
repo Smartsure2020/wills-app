@@ -15,6 +15,8 @@ import {
 } from "../../db/schema.js"
 import { auth } from "../middleware/auth.js"
 import type { AppEnv, AppUser } from "../types.js"
+import { mail } from "../../db/schema.js"
+import { EMAIL_TEMPLATES } from "../lib/email-templates.js"
 
 const listSchema = z.object({
   customerId: z.coerce.number().int().min(1),
@@ -80,6 +82,55 @@ async function syncFlowItems(flowControlId: number, flowTypeId: number) {
       orderBy: m.orderBy,
     }))
   )
+}
+
+// When an item is checked complete, look up its abbreviation and queue an email
+// if we have a template for it. Failures here are non-fatal — the item update
+// still succeeds; cron will handle send retries on its own schedule.
+async function queueEmailIfTemplateExists(flowItemId: number) {
+  try {
+    const [row] = await db
+      .select({
+        abbreviation: flowControlItem.abbreviation,
+        customerId: flowControl.customerId,
+        customerFirstName: customer.firstName,
+        customerLastName: customer.lastName,
+        customerEmail: customer.email,
+        brokerFirstName: account.firstName,
+        brokerLastName: account.lastName,
+        brokerEmail: account.email,
+      })
+      .from(flowItem)
+      .innerJoin(flowControlItem, eq(flowItem.flowControlItemId, flowControlItem.id))
+      .innerJoin(flowControl, eq(flowItem.flowControlId, flowControl.id))
+      .innerJoin(customer, eq(flowControl.customerId, customer.id))
+      .innerJoin(account, eq(customer.assignedTo, account.id))
+      .where(eq(flowItem.id, flowItemId))
+      .limit(1)
+
+    if (!row) return
+
+    const template = EMAIL_TEMPLATES[row.abbreviation]
+    if (!template) return
+
+    if (!row.customerEmail) return // skip if no address
+
+    await db.insert(mail).values({
+      address: row.customerEmail,
+      subject: template.subject,
+      body: template.buildBody({
+        firstName: row.customerFirstName,
+        lastName: row.customerLastName,
+        brokerFirstName: row.brokerFirstName,
+        brokerLastName: row.brokerLastName,
+        brokerEmail: row.brokerEmail,
+      }),
+      customerId: row.customerId,
+    })
+  } catch (err) {
+    // Don't propagate — email queueing should never block item update
+    console.error("Failed to queue email for item", flowItemId, err)
+  }
 }
 
 // ─────────────────────────────────────────────────────────

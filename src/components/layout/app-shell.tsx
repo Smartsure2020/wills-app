@@ -3,6 +3,7 @@ import { useAuth } from "@/lib/providers"
 import { cn } from "@/lib/utils"
 import type { ReactNode } from "react"
 import { Home, Users, UserCog, FileText, ListChecks, Settings } from "lucide-react"
+import { Home, Users, UserCog, FileText, ListChecks, Mail, Settings } from "lucide-react"
 
 type NavItem = {
   to: string
@@ -17,6 +18,7 @@ const navItems: NavItem[] = [
   { to: "/brokers", label: "Brokers", icon: UserCog },
   { to: "/templates", label: "Templates", icon: FileText, adminOnly: true },
   { to: "/flow-items", label: "Workflow items", icon: ListChecks, adminOnly: true },
+  { to: "/mail-outbox", label: "Mail outbox", icon: Mail, adminOnly: true },
   { to: "/settings", label: "Settings", icon: Settings },
 ]
 

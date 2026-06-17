@@ -6,4 +6,12 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/[...route]" }
   ]
+  {
+  "crons": [
+    {
+      "path": "/api/cron/send-mail",
+      "schedule": "0 * * * *"
+    }
+  ]
+}
 }
