@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TemplatesIndexRouteImport } from './routes/templates/index'
+import { Route as FlowItemsIndexRouteImport } from './routes/flow-items/index'
 import { Route as CustomersIndexRouteImport } from './routes/customers/index'
 import { Route as BrokersIndexRouteImport } from './routes/brokers/index'
 import { Route as CustomersNewRouteImport } from './routes/customers/new'
@@ -26,6 +27,11 @@ const IndexRoute = IndexRouteImport.update({
 const TemplatesIndexRoute = TemplatesIndexRouteImport.update({
   id: '/templates/',
   path: '/templates/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FlowItemsIndexRoute = FlowItemsIndexRouteImport.update({
+  id: '/flow-items/',
+  path: '/flow-items/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CustomersIndexRoute = CustomersIndexRouteImport.update({
@@ -67,6 +73,7 @@ export interface FileRoutesByFullPath {
   '/customers/new': typeof CustomersNewRoute
   '/brokers/': typeof BrokersIndexRoute
   '/customers/': typeof CustomersIndexRoute
+  '/flow-items/': typeof FlowItemsIndexRoute
   '/templates/': typeof TemplatesIndexRoute
 }
 export interface FileRoutesByTo {
@@ -77,6 +84,7 @@ export interface FileRoutesByTo {
   '/customers/new': typeof CustomersNewRoute
   '/brokers': typeof BrokersIndexRoute
   '/customers': typeof CustomersIndexRoute
+  '/flow-items': typeof FlowItemsIndexRoute
   '/templates': typeof TemplatesIndexRoute
 }
 export interface FileRoutesById {
@@ -88,6 +96,7 @@ export interface FileRoutesById {
   '/customers/new': typeof CustomersNewRoute
   '/brokers/': typeof BrokersIndexRoute
   '/customers/': typeof CustomersIndexRoute
+  '/flow-items/': typeof FlowItemsIndexRoute
   '/templates/': typeof TemplatesIndexRoute
 }
 export interface FileRouteTypes {
@@ -100,6 +109,7 @@ export interface FileRouteTypes {
     | '/customers/new'
     | '/brokers/'
     | '/customers/'
+    | '/flow-items/'
     | '/templates/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -110,6 +120,7 @@ export interface FileRouteTypes {
     | '/customers/new'
     | '/brokers'
     | '/customers'
+    | '/flow-items'
     | '/templates'
   id:
     | '__root__'
@@ -120,6 +131,7 @@ export interface FileRouteTypes {
     | '/customers/new'
     | '/brokers/'
     | '/customers/'
+    | '/flow-items/'
     | '/templates/'
   fileRoutesById: FileRoutesById
 }
@@ -131,6 +143,7 @@ export interface RootRouteChildren {
   CustomersNewRoute: typeof CustomersNewRoute
   BrokersIndexRoute: typeof BrokersIndexRoute
   CustomersIndexRoute: typeof CustomersIndexRoute
+  FlowItemsIndexRoute: typeof FlowItemsIndexRoute
   TemplatesIndexRoute: typeof TemplatesIndexRoute
 }
 
@@ -148,6 +161,13 @@ declare module '@tanstack/react-router' {
       path: '/templates'
       fullPath: '/templates/'
       preLoaderRoute: typeof TemplatesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/flow-items/': {
+      id: '/flow-items/'
+      path: '/flow-items'
+      fullPath: '/flow-items/'
+      preLoaderRoute: typeof FlowItemsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/customers/': {
@@ -203,6 +223,7 @@ const rootRouteChildren: RootRouteChildren = {
   CustomersNewRoute: CustomersNewRoute,
   BrokersIndexRoute: BrokersIndexRoute,
   CustomersIndexRoute: CustomersIndexRoute,
+  FlowItemsIndexRoute: FlowItemsIndexRoute,
   TemplatesIndexRoute: TemplatesIndexRoute,
 }
 export const routeTree = rootRouteImport

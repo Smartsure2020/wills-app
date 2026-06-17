@@ -24,6 +24,7 @@ import {
 import { customersApi, type CustomerDetail } from "@/lib/api/customers"
 import { formatDate, formatMoney } from "@/lib/format"
 import { DocumentsCard } from "@/components/customers/documents-card"
+import { WorkflowChecklist } from "@/components/customers/workflow-checklist"
 
 const searchSchema = z.object({
   folder: z.coerce.number().int().min(0).default(0),
@@ -224,28 +225,19 @@ function CustomerProfile({ customer }: { customer: CustomerDetail }) {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <DocumentsCard
-          customerId={customer.id}
-          parentId={folder}
-          onNavigateToFolder={(folderId) =>
-            navigate({
-              to: "/customers/$customerId",
-              params: { customerId: String(customer.id) },
-              search: { folder: folderId },
-            })
-          }
-        />
+      <DocumentsCard
+        customerId={customer.id}
+        parentId={folder}
+        onNavigateToFolder={(folderId) =>
+          navigate({
+            to: "/customers/$customerId",
+            params: { customerId: String(customer.id) },
+            search: { folder: folderId },
+          })
+        }
+      />
 
-        <Card className="border-dashed">
-          <CardHeader>
-            <CardTitle className="text-base">Will workflow</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            Flow checklist coming in Phase 4.
-          </CardContent>
-        </Card>
-      </div>
+      <WorkflowChecklist customerId={customer.id} />
     </div>
   )
 }
