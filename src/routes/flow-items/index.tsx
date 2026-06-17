@@ -42,10 +42,10 @@ export const Route = createFileRoute("/flow-items/")({
 })
 
 const itemSchema = z.object({
-  flowTypeId: z.coerce.number().int().min(1, "Required"),
+  flowTypeId: z.number().int().min(1, "Required"),
   abbreviation: z.string().min(1, "Required").max(50),
   description: z.string().min(1, "Required").max(2000),
-  orderBy: z.coerce.number().int(),
+  orderBy: z.number().int(),
 })
 
 type ItemFormData = z.infer<typeof itemSchema>
@@ -198,10 +198,13 @@ function EditItemDialog({
   })
 
   const mutation = useMutation({
-    mutationFn: (data: ItemFormData) =>
-      isNew
-        ? flowControlItemsApi.create(data)
-        : flowControlItemsApi.update(item!.id, data),
+    mutationFn: async (data: ItemFormData) => {
+      if (isNew) {
+        await flowControlItemsApi.create(data)
+      } else {
+        await flowControlItemsApi.update(item!.id, data)
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["flow-control-items"] })
       onOpenChange(false)
@@ -283,7 +286,11 @@ function EditItemDialog({
                 <FormItem>
                   <FormLabel>Sort order</FormLabel>
                   <FormControl>
-                    <Input type="number" {...field} />
+                    <Input
+                      type="number"
+                      {...field}
+                      onChange={(e) => field.onChange(e.target.valueAsNumber || 0)}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -334,8 +341,8 @@ function DeleteItemDialog({
         <DialogHeader>
           <DialogTitle>Delete "{target?.description}"?</DialogTitle>
           <DialogDescription>
-            This removes the master item. Existing customer checklists retain their
-            flow_item rows pointing to this item until manually cleaned up.
+            This removes the master item from existing customer checklists,
+            including any attached document links for that checklist item.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -350,6 +357,11 @@ function DeleteItemDialog({
             Delete
           </Button>
         </DialogFooter>
+        {mutation.isError && (
+          <div className="text-xs text-destructive">
+            {mutation.error instanceof Error ? mutation.error.message : "Delete failed"}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )
