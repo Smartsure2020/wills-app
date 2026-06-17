@@ -147,7 +147,7 @@ documentsRoute.get("/", zValidator("query", listSchema), async (c) => {
       FROM folder_path
       ORDER BY depth DESC
     `)
-    breadcrumbs = (result as any).rows.map((row: any) => ({
+    breadcrumbs = (result as any[]).map((row: any) => ({
       id: Number(row.id),
       parentId: Number(row.parent_id),
       documentName: row.document_name,
@@ -356,7 +356,7 @@ documentsRoute.post("/:id/move", zValidator("json", moveSchema), async (c) => {
         )
         SELECT 1 FROM descendants WHERE id = ${newParentId} LIMIT 1
       `)
-      if ((cycleCheck as any).rows.length > 0) {
+      if ((cycleCheck as any[]).length > 0) {
         return c.json({ error: "Cannot move a folder into its own descendant" }, 400)
       }
     }
