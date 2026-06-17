@@ -175,7 +175,20 @@ function AddCustomerPage() {
       </div>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          onKeyDown={(e) => {
+            if (
+              e.key === "Enter" &&
+              e.target instanceof HTMLElement &&
+              e.target.tagName !== "TEXTAREA" &&
+              e.target.tagName !== "BUTTON"
+            ) {
+              e.preventDefault()
+            }
+          }}
+          className="space-y-6"
+        >
           {step === 1 ? <Step1 control={form.control} /> : <Step2 control={form.control} />}
 
           {submitError && (
