@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { createFileRoute } from "@tanstack/react-router"
 import { useMutation, useQuery } from "@tanstack/react-query"
-import { Plus, Edit, Trash2, Loader2, AlertCircle, GripVertical } from "lucide-react"
+import { Plus, Edit, Trash2, Loader2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,6 +13,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -24,7 +31,10 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
-import { flowItemsApi, type FlowItem } from "@/lib/api/flow-items"
+import {
+  flowControlItemsApi,
+  type FlowControlItem,
+} from "@/lib/api/flow-control-items"
 import { queryClient, useAuth } from "@/lib/providers"
 
 export const Route = createFileRoute("/flow-items/")({
@@ -32,22 +42,22 @@ export const Route = createFileRoute("/flow-items/")({
 })
 
 const itemSchema = z.object({
-  name: z.string().min(1, "Required").max(500),
-  description: z.string().max(2000),
-  sectionName: z.string().max(200),
-  sortOrder: z.number().int(),
+  flowTypeId: z.coerce.number().int().min(1, "Required"),
+  abbreviation: z.string().min(1, "Required").max(50),
+  description: z.string().min(1, "Required").max(2000),
+  orderBy: z.coerce.number().int(),
 })
 
 type ItemFormData = z.infer<typeof itemSchema>
 
 function FlowItemsPage() {
   const user = useAuth()
-  const [editing, setEditing] = useState<FlowItem | "new" | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<FlowItem | null>(null)
+  const [editing, setEditing] = useState<FlowControlItem | "new" | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<FlowControlItem | null>(null)
 
   const { data, isLoading } = useQuery({
-    queryKey: ["flow-items"],
-    queryFn: () => flowItemsApi.list(),
+    queryKey: ["flow-control-items"],
+    queryFn: () => flowControlItemsApi.list(),
   })
 
   if (user.accountTypeId !== 1 && !user.manageAll) {
@@ -57,9 +67,6 @@ function FlowItemsPage() {
           <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
           <div>
             <div className="font-medium">Admin access required</div>
-            <p className="text-sm text-muted-foreground mt-1">
-              Workflow items can only be managed by admins or brokers with ManageAll.
-            </p>
           </div>
         </div>
       </div>
@@ -67,14 +74,14 @@ function FlowItemsPage() {
   }
 
   const items = data?.items ?? []
+  const flowTypes = data?.flowTypes ?? []
 
-  // Group by section for display
-  const grouped = new Map<string, FlowItem[]>()
+  // Group by flow type
+  const grouped = new Map<number, FlowControlItem[]>()
   for (const item of items) {
-    const section = item.sectionName || "Uncategorised"
-    const arr = grouped.get(section) ?? []
+    const arr = grouped.get(item.flowTypeId) ?? []
     arr.push(item)
-    grouped.set(section, arr)
+    grouped.set(item.flowTypeId, arr)
   }
 
   return (
@@ -83,10 +90,8 @@ function FlowItemsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Workflow items</h1>
           <p className="text-muted-foreground mt-1 max-w-prose">
-            The master checklist every customer follows. Items added here appear on
-            every customer's workflow checklist. Group items with section names
-            (e.g. "Information Gathering", "Will Drafting"). Sort order controls
-            display position within a section.
+            The master checklist customers follow, grouped by flow type. Each customer
+            sees the items matching their assigned flow type(s).
           </p>
         </div>
         <Button onClick={() => setEditing("new")}>
@@ -95,42 +100,44 @@ function FlowItemsPage() {
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{items.length} item{items.length === 1 ? "" : "s"}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-sm text-muted-foreground py-4">Loading…</div>
-          ) : items.length === 0 ? (
-            <div className="text-sm text-muted-foreground text-center py-8 border border-dashed rounded-md">
-              No workflow items yet. Add the first one to start building the checklist.
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {Array.from(grouped.entries()).map(([section, sectionItems]) => (
-                <div key={section}>
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                    {section}
-                  </h3>
+      {isLoading ? (
+        <Card>
+          <CardContent className="py-8 text-sm text-muted-foreground">
+            Loading…
+          </CardContent>
+        </Card>
+      ) : (
+        flowTypes.map((ft) => {
+          const ftItems = grouped.get(ft.id) ?? []
+          return (
+            <Card key={ft.id}>
+              <CardHeader>
+                <CardTitle className="text-base">
+                  {ft.description}{" "}
+                  <span className="text-muted-foreground font-normal">
+                    ({ftItems.length} item{ftItems.length === 1 ? "" : "s"})
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {ftItems.length === 0 ? (
+                  <div className="text-sm text-muted-foreground text-center py-6 border border-dashed rounded-md">
+                    No items for this flow type yet.
+                  </div>
+                ) : (
                   <div className="divide-y border rounded-md">
-                    {sectionItems.map((item) => (
+                    {ftItems.map((item) => (
                       <div
                         key={item.id}
                         className="flex items-center gap-3 py-2 px-3 hover:bg-accent/30"
                       >
-                        <GripVertical className="h-4 w-4 text-muted-foreground" />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium">{item.name}</div>
-                          {item.description && (
-                            <div className="text-xs text-muted-foreground truncate">
-                              {item.description}
-                            </div>
-                          )}
+                        <div className="text-xs text-muted-foreground tabular-nums w-12">
+                          #{item.orderBy}
                         </div>
-                        <div className="text-xs text-muted-foreground tabular-nums">
-                          #{item.sortOrder}
+                        <div className="font-mono text-xs bg-muted px-2 py-0.5 rounded">
+                          {item.abbreviation}
                         </div>
+                        <div className="flex-1 text-sm">{item.description}</div>
                         <Button
                           size="sm"
                           variant="ghost"
@@ -148,18 +155,18 @@ function FlowItemsPage() {
                       </div>
                     ))}
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                )}
+              </CardContent>
+            </Card>
+          )
+        })
+      )}
 
       <EditItemDialog
         target={editing}
+        flowTypes={flowTypes}
         onOpenChange={(open) => !open && setEditing(null)}
       />
-
       <DeleteItemDialog
         target={deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
@@ -170,9 +177,11 @@ function FlowItemsPage() {
 
 function EditItemDialog({
   target,
+  flowTypes,
   onOpenChange,
 }: {
-  target: FlowItem | "new" | null
+  target: FlowControlItem | "new" | null
+  flowTypes: { id: number; description: string }[]
   onOpenChange: (open: boolean) => void
 }) {
   const isNew = target === "new"
@@ -181,23 +190,20 @@ function EditItemDialog({
   const form = useForm<ItemFormData>({
     resolver: zodResolver(itemSchema),
     values: {
-      name: item?.name ?? "",
+      flowTypeId: item?.flowTypeId ?? flowTypes[0]?.id ?? 1,
+      abbreviation: item?.abbreviation ?? "",
       description: item?.description ?? "",
-      sectionName: item?.sectionName ?? "",
-      sortOrder: item?.sortOrder ?? 0,
+      orderBy: item?.orderBy ?? 0,
     },
   })
 
   const mutation = useMutation({
-    mutationFn: async (data: ItemFormData) => {
-      if (isNew) {
-        await flowItemsApi.create(data)
-      } else {
-        await flowItemsApi.update(item!.id, data)
-      }
-    },
+    mutationFn: (data: ItemFormData) =>
+      isNew
+        ? flowControlItemsApi.create(data)
+        : flowControlItemsApi.update(item!.id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["flow-items"] })
+      queryClient.invalidateQueries({ queryKey: ["flow-control-items"] })
       onOpenChange(false)
       form.reset()
     },
@@ -209,9 +215,7 @@ function EditItemDialog({
         <DialogHeader>
           <DialogTitle>{isNew ? "Add workflow item" : "Edit workflow item"}</DialogTitle>
           <DialogDescription>
-            {isNew
-              ? "This item will appear on every customer's checklist."
-              : "Changes apply to all customers using this item."}
+            New items appear on every customer with a matching flow type.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -221,12 +225,39 @@ function EditItemDialog({
           >
             <FormField
               control={form.control}
-              name="name"
+              name="flowTypeId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Name</FormLabel>
+                  <FormLabel>Flow type</FormLabel>
+                  <Select
+                    onValueChange={(v) => field.onChange(Number(v))}
+                    value={String(field.value)}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {flowTypes.map((ft) => (
+                        <SelectItem key={ft.id} value={String(ft.id)}>
+                          {ft.description}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="abbreviation"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Abbreviation</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="e.g. Verify identity documents" />
+                    <Input {...field} placeholder="e.g. VFID" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -237,46 +268,27 @@ function EditItemDialog({
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description (optional)</FormLabel>
+                  <FormLabel>Description</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="What needs to happen for this item" />
+                    <Input {...field} placeholder="e.g. Verify customer identity documents" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="sectionName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Section</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="e.g. Information Gathering" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="sortOrder"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Sort order</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        {...field}
-                        onChange={(e) => field.onChange(e.target.valueAsNumber || 0)}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="orderBy"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Sort order</FormLabel>
+                  <FormControl>
+                    <Input type="number" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <DialogFooter>
               <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
                 Cancel
@@ -288,9 +300,9 @@ function EditItemDialog({
                     Saving…
                   </>
                 ) : isNew ? (
-                  "Add item"
+                  "Add"
                 ) : (
-                  "Save changes"
+                  "Save"
                 )}
               </Button>
             </DialogFooter>
@@ -305,13 +317,13 @@ function DeleteItemDialog({
   target,
   onOpenChange,
 }: {
-  target: FlowItem | null
+  target: FlowControlItem | null
   onOpenChange: (open: boolean) => void
 }) {
   const mutation = useMutation({
-    mutationFn: () => flowItemsApi.delete(target!.id),
+    mutationFn: () => flowControlItemsApi.delete(target!.id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["flow-items"] })
+      queryClient.invalidateQueries({ queryKey: ["flow-control-items"] })
       onOpenChange(false)
     },
   })
@@ -320,11 +332,10 @@ function DeleteItemDialog({
     <Dialog open={!!target} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Delete "{target?.name}"?</DialogTitle>
+          <DialogTitle>Delete "{target?.description}"?</DialogTitle>
           <DialogDescription>
-            This item will be removed from the master list. Existing customer
-            checklists will also remove this item, including any completion records
-            attached to it.
+            This removes the master item. Existing customer checklists retain their
+            flow_item rows pointing to this item until manually cleaned up.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -336,14 +347,7 @@ function DeleteItemDialog({
             onClick={() => mutation.mutate()}
             disabled={mutation.isPending}
           >
-            {mutation.isPending ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Deleting…
-              </>
-            ) : (
-              "Delete"
-            )}
+            Delete
           </Button>
         </DialogFooter>
       </DialogContent>

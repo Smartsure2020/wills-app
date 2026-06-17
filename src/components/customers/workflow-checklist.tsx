@@ -1,21 +1,13 @@
-import { useMemo } from "react"
 import { useMutation, useQuery } from "@tanstack/react-query"
-import { Check, Loader2, AlertCircle } from "lucide-react"
+import { Check, Loader2, AlertCircle, MinusCircle, RotateCcw } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  flowControlApi,
-  FLOW_STATES,
-  FLOW_STATE_LABELS,
-  type FlowControlItem,
-  type FlowState,
-} from "@/lib/api/flow-control"
+  flowChecklistApi,
+  type FlowChecklistItem,
+  type FlowChecklistGroup,
+} from "@/lib/api/flow-checklist"
 import { queryClient } from "@/lib/providers"
 import { formatDateShort } from "@/lib/format"
 
@@ -25,28 +17,9 @@ type Props = {
 
 export function WorkflowChecklist({ customerId }: Props) {
   const { data, isLoading, error } = useQuery({
-    queryKey: ["flow-control", customerId],
-    queryFn: () => flowControlApi.get(customerId),
+    queryKey: ["flow-checklist", customerId],
+    queryFn: () => flowChecklistApi.get(customerId),
   })
-
-  const items = data?.items ?? []
-
-  // Group by section
-  const grouped = useMemo(() => {
-    const map = new Map<string, FlowControlItem[]>()
-    for (const item of items) {
-      const section = item.sectionName || "General"
-      const arr = map.get(section) ?? []
-      arr.push(item)
-      map.set(section, arr)
-    }
-    return map
-  }, [items])
-
-  // Progress
-  const completed = items.filter((i) => i.state === FLOW_STATES.COMPLETED).length
-  const total = items.length
-  const progressPct = total > 0 ? Math.round((completed / total) * 100) : 0
 
   if (isLoading) {
     return (
@@ -76,21 +49,23 @@ export function WorkflowChecklist({ customerId }: Props) {
     )
   }
 
-  if (items.length === 0) {
+  const flowControls = data?.flowControls ?? []
+
+  if (flowControls.length === 0) {
     return (
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Workflow checklist</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-4 flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
-            <div className="text-sm">
-              <div className="font-medium">No workflow items defined yet</div>
+          <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-4 text-sm flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0" />
+            <div>
+              <div className="font-medium">No flow control records</div>
               <p className="text-muted-foreground mt-1">
-                Admins can add items at{" "}
-                <code className="text-xs bg-muted px-1 py-0.5 rounded">/flow-items</code>.
-                Items added there appear automatically on every customer's checklist.
+                This customer has no flow_control rows. The customer-create logic
+                normally creates one — if this is an older customer, you may need to
+                create one manually via SQL.
               </p>
             </div>
           </div>
@@ -100,93 +75,167 @@ export function WorkflowChecklist({ customerId }: Props) {
   }
 
   return (
+    <div className="space-y-4">
+      {flowControls.map((fc) => (
+        <FlowControlGroup key={fc.id} group={fc} customerId={customerId} />
+      ))}
+    </div>
+  )
+}
+
+function FlowControlGroup({
+  group,
+  customerId,
+}: {
+  group: FlowChecklistGroup
+  customerId: number
+}) {
+  const total = group.items.filter((i) => i.applicable).length
+  const completed = group.items.filter(
+    (i) => i.applicable && i.checkedDate
+  ).length
+  const pct = total > 0 ? Math.round((completed / total) * 100) : 0
+
+  return (
     <Card>
       <CardHeader>
         <div className="flex items-start justify-between">
           <div>
-            <CardTitle className="text-base">Workflow checklist</CardTitle>
+            <CardTitle className="text-base">
+              {group.flowTypeName}{" "}
+              {group.completed && (
+                <Badge variant="secondary" className="ml-1">
+                  Complete
+                </Badge>
+              )}
+            </CardTitle>
             <p className="text-xs text-muted-foreground mt-1">
-              {completed} of {total} completed · {progressPct}%
+              {completed} of {total} completed · {pct}%
             </p>
           </div>
           <div className="w-32 h-2 bg-muted rounded-full overflow-hidden">
             <div
               className="h-full bg-primary transition-all"
-              style={{ width: `${progressPct}%` }}
+              style={{ width: `${pct}%` }}
             />
           </div>
         </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-6">
-          {Array.from(grouped.entries()).map(([section, sectionItems]) => (
-            <div key={section}>
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                {section}
-              </h3>
-              <div className="divide-y border rounded-md">
-                {sectionItems.map((item) => (
-                  <ChecklistRow key={item.id} item={item} customerId={customerId} />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+        {group.items.length === 0 ? (
+          <div className="text-sm text-muted-foreground text-center py-6 border border-dashed rounded-md">
+            No items configured for this flow type. Admins can add them at{" "}
+            <code className="text-xs bg-muted px-1 py-0.5 rounded">/flow-items</code>.
+          </div>
+        ) : (
+          <div className="divide-y border rounded-md">
+            {group.items.map((item) => (
+              <ChecklistRow key={item.id} item={item} customerId={customerId} />
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   )
 }
 
-function ChecklistRow({ item, customerId }: { item: FlowControlItem; customerId: number }) {
+function ChecklistRow({
+  item,
+  customerId,
+}: {
+  item: FlowChecklistItem
+  customerId: number
+}) {
   const mutation = useMutation({
-    mutationFn: (state: FlowState) => flowControlApi.updateItem(item.id, { state }),
+    mutationFn: (input: { checked?: boolean; applicable?: boolean }) =>
+      flowChecklistApi.updateItem(item.id, input),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["flow-control", customerId] })
+      queryClient.invalidateQueries({ queryKey: ["flow-checklist", customerId] })
     },
   })
 
-  const completedBy = item.completedByFirstName
-    ? `${item.completedByFirstName} ${item.completedByLastName ?? ""}`.trim()
+  const isChecked = !!item.checkedDate
+  const isNotApplicable = !item.applicable
+
+  const checkedByName = item.checkedByFirstName
+    ? `${item.checkedByFirstName} ${item.checkedByLastName ?? ""}`.trim()
     : null
 
   return (
     <div>
       <div className="flex items-center gap-3 py-2.5 px-3 hover:bg-accent/30">
-        <StateIndicator state={item.state} />
+        <button
+          type="button"
+          onClick={() => mutation.mutate({ checked: !isChecked })}
+          disabled={mutation.isPending || isNotApplicable}
+          className={`h-5 w-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+            isNotApplicable
+              ? "bg-muted border-muted-foreground/30 cursor-not-allowed opacity-50"
+              : isChecked
+              ? "bg-green-500 border-green-600 hover:bg-green-600"
+              : "border-muted-foreground/40 hover:border-foreground"
+          }`}
+          title={
+            isNotApplicable
+              ? "Marked not applicable"
+              : isChecked
+              ? "Click to uncheck"
+              : "Click to mark complete"
+          }
+        >
+          {isChecked && !isNotApplicable && <Check className="h-3 w-3 text-white" />}
+        </button>
+
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium">{item.name}</div>
-          {item.description && (
-            <div className="text-xs text-muted-foreground">{item.description}</div>
-          )}
-          {item.state === FLOW_STATES.COMPLETED && item.completedAt && (
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
+              {item.abbreviation}
+            </span>
+            <span
+              className={`text-sm font-medium ${
+                isNotApplicable ? "line-through text-muted-foreground" : ""
+              }`}
+            >
+              {item.description}
+            </span>
+          </div>
+          {isChecked && item.checkedDate && (
             <div className="text-xs text-muted-foreground mt-0.5">
-              Completed {formatDateShort(item.completedAt)}
-              {completedBy ? ` by ${completedBy}` : ""}
+              Completed {formatDateShort(item.checkedDate)}
+              {checkedByName ? ` by ${checkedByName}` : ""}
             </div>
           )}
         </div>
-        <div className="flex-shrink-0 flex items-center gap-2">
+
+        <div className="flex items-center gap-1 flex-shrink-0">
           {mutation.isPending && (
             <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
           )}
-          <Select
-            value={String(item.state)}
-            onValueChange={(v) => mutation.mutate(Number(v) as FlowState)}
-            disabled={mutation.isPending}
-          >
-            <SelectTrigger className="w-44 h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {(Object.entries(FLOW_STATE_LABELS) as [string, string][]).map(
-                ([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                )
-              )}
-            </SelectContent>
-          </Select>
+          {isNotApplicable ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => mutation.mutate({ applicable: true })}
+              disabled={mutation.isPending}
+              title="Mark applicable"
+              className="h-7 text-xs"
+            >
+              <RotateCcw className="h-3.5 w-3.5 mr-1" />
+              Restore
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => mutation.mutate({ applicable: false })}
+              disabled={mutation.isPending}
+              title="Mark not applicable"
+              className="h-7 text-xs"
+            >
+              <MinusCircle className="h-3.5 w-3.5 mr-1" />
+              N/A
+            </Button>
+          )}
         </div>
       </div>
       {mutation.isError && (
@@ -194,26 +243,6 @@ function ChecklistRow({ item, customerId }: { item: FlowControlItem; customerId:
           {mutation.error instanceof Error ? mutation.error.message : "Update failed"}
         </div>
       )}
-    </div>
-  )
-}
-
-function StateIndicator({ state }: { state: FlowState }) {
-  const config: Record<FlowState, { className: string; label: string }> = {
-    0: { className: "bg-muted border-muted-foreground/30", label: "Not started" },
-    1: { className: "bg-blue-500 border-blue-600", label: "In progress" },
-    2: { className: "bg-amber-500 border-amber-600", label: "Awaiting" },
-    3: { className: "bg-green-500 border-green-600", label: "Done" },
-    4: { className: "bg-muted border-muted-foreground/30", label: "Skipped" },
-  }
-
-  const cfg = config[state]
-  return (
-    <div
-      className={`h-5 w-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${cfg.className}`}
-      title={cfg.label}
-    >
-      {state === FLOW_STATES.COMPLETED && <Check className="h-3 w-3 text-white" />}
     </div>
   )
 }
