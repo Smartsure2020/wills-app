@@ -386,7 +386,7 @@ customersRoute.post("/", zValidator("json", customerCreateSchema), async (c) => 
       }
 
       // Step 4: clone DocumentTemplate tree into Document tree
-      const docTemplates = await tx.select().from(documentTemplate)
+      const docTemplates = await tx.select().from(documentTemplate).where(isNull(documentTemplate.deletedAt))
 
       if (docTemplates.length > 0) {
         // BFS from root so parents are always inserted before children
@@ -411,7 +411,7 @@ customersRoute.post("/", zValidator("json", customerCreateSchema), async (c) => 
               .values({
                 parentId: newParentId,
                 customerId: newCustomer.id,
-                documentName: t.folderName,
+                documentName: t.documentName,
                 internalName: "",
                 path: "",
                 isFolder: true,

@@ -256,8 +256,11 @@ export const document = pgTable(
 export const documentTemplate = pgTable("document_template", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   parentId: bigint("parent_id", { mode: "number" }).notNull().default(0),
-  folderName: varchar("folder_name", { length: 500 }).notNull(),
-  orderBy: integer("order_by").notNull().default(0),
+  documentName: varchar("document_name", { length: 500 }).notNull(),
+  isFolder: boolean("is_folder").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdBy: uuid("created_by").references(() => account.id),
+  deletedAt: timestamp("deleted_at"),
 })
 
 export const flowItemDocument = pgTable("flow_item_document", {

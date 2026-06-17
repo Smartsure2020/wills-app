@@ -79,12 +79,7 @@ documentTemplatesRoute.post("/", zValidator("json", createSchema), async (c) => 
     .values({
       parentId: input.parentId,
       documentName: input.folderName,
-      internalName: "",
-      path: "",
       isFolder: true,
-      inVault: false,
-      contentType: "",
-      password: "",
       createdBy: user.id,
     })
     .returning({
