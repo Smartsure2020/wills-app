@@ -8,13 +8,14 @@ type NavItem = {
   to: string
   label: string
   icon: typeof Home
+  adminOnly?: boolean
 }
 
 const navItems: NavItem[] = [
   { to: "/", label: "Dashboard", icon: Home },
   { to: "/customers", label: "Customers", icon: Users },
   { to: "/brokers", label: "Brokers", icon: UserCog },
-  { to: "/templates", label: "Templates", icon: FileText },
+  { to: "/templates", label: "Templates", icon: FileText, adminOnly: true },
   { to: "/settings", label: "Settings", icon: Settings },
 ]
 
@@ -30,7 +31,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
 
         <nav className="p-3 space-y-1">
-          {navItems.map((item) => (
+          {navItems
+            .filter((item) => !item.adminOnly || user.accountTypeId === 1 || user.manageAll)
+            .map((item) => (
             <Link
               key={item.to}
               to={item.to}

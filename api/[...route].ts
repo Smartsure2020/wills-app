@@ -8,6 +8,7 @@ import { customersRoute } from "../src/server/routes/customers.js"
 import { accountsRoute } from "../src/server/routes/accounts.js"
 import { dataRoute } from "../src/server/routes/data.js"
 import { documentsRoute } from "../src/server/routes/documents.js"
+import { documentTemplatesRoute } from "../src/server/routes/document-templates.js"
 
 export const config = { runtime: "nodejs" }
 
@@ -49,6 +50,7 @@ app.route("/customers", customersRoute)
 app.route("/accounts", accountsRoute)
 app.route("/data", dataRoute)
 app.route("/documents", documentsRoute)
+app.route("/document-templates", documentTemplatesRoute)
 
 // ──── Catch-all 404 ────
 
