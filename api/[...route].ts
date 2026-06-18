@@ -13,7 +13,6 @@ import { flowControlItemsRoute } from "../src/server/routes/flow-control-items.j
 import { flowChecklistRoute } from "../src/server/routes/flow-checklist.js"
 import { cronRoute } from "../src/server/routes/cron.js"
 import { mailOutboxRoute } from "../src/server/routes/mail-outbox.js"
-import { cronRoute } from "../src/server/routes/cron.js"
 
 export const config = { runtime: "nodejs" }
 
@@ -60,7 +59,6 @@ app.route("/flow-control-items", flowControlItemsRoute)
 app.route("/flow-checklist", flowChecklistRoute)
 app.route("/cron", cronRoute)
 app.route("/mail-outbox", mailOutboxRoute)
-app.route("/cron", cronRoute)
 
 // ──── Catch-all 404 ────
 
