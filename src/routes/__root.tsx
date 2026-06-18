@@ -12,11 +12,12 @@ export const Route = createRootRoute({
 
 function RootLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
-  const isLoginRoute = pathname === "/login"
+  const isPublicRoute =
+    pathname === "/login" || pathname.startsWith("/auth/")
 
   return (
     <AppProviders>
-      {isLoginRoute ? (
+      {isPublicRoute ? (
         <Outlet />
       ) : (
         <AppShell>

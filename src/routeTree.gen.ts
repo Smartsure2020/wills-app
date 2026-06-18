@@ -20,6 +20,7 @@ import { Route as CustomersNewRouteImport } from './routes/customers/new'
 import { Route as CustomersCustomerIdRouteImport } from './routes/customers/$customerId'
 import { Route as BrokersNewRouteImport } from './routes/brokers/new'
 import { Route as BrokersBrokerIdRouteImport } from './routes/brokers/$brokerId'
+import { Route as AuthSetupPasswordRouteImport } from './routes/auth/setup-password'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -76,10 +77,16 @@ const BrokersBrokerIdRoute = BrokersBrokerIdRouteImport.update({
   path: '/brokers/$brokerId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthSetupPasswordRoute = AuthSetupPasswordRouteImport.update({
+  id: '/auth/setup-password',
+  path: '/auth/setup-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/auth/setup-password': typeof AuthSetupPasswordRoute
   '/brokers/$brokerId': typeof BrokersBrokerIdRoute
   '/brokers/new': typeof BrokersNewRoute
   '/customers/$customerId': typeof CustomersCustomerIdRoute
@@ -93,6 +100,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/auth/setup-password': typeof AuthSetupPasswordRoute
   '/brokers/$brokerId': typeof BrokersBrokerIdRoute
   '/brokers/new': typeof BrokersNewRoute
   '/customers/$customerId': typeof CustomersCustomerIdRoute
@@ -107,6 +115,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/auth/setup-password': typeof AuthSetupPasswordRoute
   '/brokers/$brokerId': typeof BrokersBrokerIdRoute
   '/brokers/new': typeof BrokersNewRoute
   '/customers/$customerId': typeof CustomersCustomerIdRoute
@@ -122,6 +131,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/auth/setup-password'
     | '/brokers/$brokerId'
     | '/brokers/new'
     | '/customers/$customerId'
@@ -135,6 +145,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/auth/setup-password'
     | '/brokers/$brokerId'
     | '/brokers/new'
     | '/customers/$customerId'
@@ -148,6 +159,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/login'
+    | '/auth/setup-password'
     | '/brokers/$brokerId'
     | '/brokers/new'
     | '/customers/$customerId'
@@ -162,6 +174,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
+  AuthSetupPasswordRoute: typeof AuthSetupPasswordRoute
   BrokersBrokerIdRoute: typeof BrokersBrokerIdRoute
   BrokersNewRoute: typeof BrokersNewRoute
   CustomersCustomerIdRoute: typeof CustomersCustomerIdRoute
@@ -252,12 +265,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BrokersBrokerIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/setup-password': {
+      id: '/auth/setup-password'
+      path: '/auth/setup-password'
+      fullPath: '/auth/setup-password'
+      preLoaderRoute: typeof AuthSetupPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
+  AuthSetupPasswordRoute: AuthSetupPasswordRoute,
   BrokersBrokerIdRoute: BrokersBrokerIdRoute,
   BrokersNewRoute: BrokersNewRoute,
   CustomersCustomerIdRoute: CustomersCustomerIdRoute,

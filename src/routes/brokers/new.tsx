@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router"
+import { createFileRoute, Link } from "@tanstack/react-router"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -38,7 +38,7 @@ type BrokerFormData = z.infer<typeof brokerSchema>
 
 function AddBrokerPage() {
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const navigate = useNavigate()
+  const [createdEmail, setCreatedEmail] = useState<string | null>(null)
 
   const form = useForm<BrokerFormData>({
     resolver: zodResolver(brokerSchema),
@@ -58,9 +58,10 @@ function AddBrokerPage() {
         accountTypeId: BROKER_TYPE_ID,
         ...data,
       }),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["accounts"] })
-      navigate({ to: "/brokers" })
+      setCreatedEmail(variables.email)
+      form.reset()
     },
     onError: (err) => {
       setSubmitError(err instanceof Error ? err.message : "Unknown error")
@@ -87,6 +88,48 @@ function AddBrokerPage() {
           New brokers won't be able to log in until auth is wired up in a later phase.
         </p>
       </div>
+
+      {createdEmail && (
+        <div className="rounded-md border border-green-500/50 bg-green-500/10 p-4">
+          <div className="flex items-start gap-3">
+            <div className="h-8 w-8 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+              <svg
+                className="h-4 w-4 text-white"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={3}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <div className="font-medium">Invite sent</div>
+              <p className="text-sm text-muted-foreground mt-1">
+                An invitation email has been sent to{" "}
+                <code className="bg-muted px-1 py-0.5 rounded">{createdEmail}</code>.
+                They'll set their own password via the link in the email.
+              </p>
+              <div className="flex gap-2 mt-3">
+                <Button asChild size="sm" variant="outline">
+                  <Link to="/brokers">Back to brokers</Link>
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setCreatedEmail(null)}
+                >
+                  Add another
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">

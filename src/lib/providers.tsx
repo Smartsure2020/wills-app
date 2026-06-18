@@ -75,18 +75,21 @@ function AuthGate({ children }: { children: ReactNode }) {
   const location = useRouterState({ select: (s) => s.location })
 
   useEffect(() => {
-    if (!isLoading && !session && location.pathname !== "/login") {
-      navigate({ to: "/login" })
-    }
-  }, [isLoading, session, location.pathname, navigate])
+  const isPublicRoute =
+    location.pathname === "/login" || location.pathname.startsWith("/auth/")
+  
+  if (!isLoading && !session && !isPublicRoute) {
+    navigate({ to: "/login" })
+  }
+}, [isLoading, session, location.pathname, navigate])
 
   if (isLoading) {
     return <FullPageMessage>Loading session…</FullPageMessage>
   }
 
-  if (!session && location.pathname !== "/login") {
-    return <FullPageMessage>Redirecting to sign in…</FullPageMessage>
-  }
+  if (!session && location.pathname !== "/login" && !location.pathname.startsWith("/auth/")) {
+  return <FullPageMessage>Redirecting to sign in…</FullPageMessage>
+}
 
   return <>{children}</>
 }

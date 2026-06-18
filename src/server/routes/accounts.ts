@@ -6,6 +6,7 @@ import { db } from "../../db/index.js"
 import { account, accountType } from "../../db/schema.js"
 import { auth } from "../middleware/auth.js"
 import { paginated, paginationOffset } from "../pagination.js"
+import { supabaseAdmin } from "../lib/supabase.js"
 import type { AppEnv } from "../types.js"
 
 // ─────────────────────────────────────────────────────────
@@ -161,7 +162,7 @@ accountsRoute.post("/", zValidator("json", accountCreateSchema), async (c) => {
     return c.json({ error: "customerId is required for customer accounts" }, 400)
   }
 
-  // Email uniqueness
+  // Email uniqueness check against the account table
   const [existing] = await db
     .select({ id: account.id })
     .from(account)
@@ -172,21 +173,60 @@ accountsRoute.post("/", zValidator("json", accountCreateSchema), async (c) => {
     return c.json({ error: "An account with this email already exists" }, 409)
   }
 
-  const [newAccount] = await db
-    .insert(account)
-    .values({
-      accountTypeId: input.accountTypeId,
-      email: input.email,
-      firstName: input.firstName,
-      lastName: input.lastName,
-      contactNumber: input.contactNumber,
-      manageAll: input.manageAll,
-      customerId: input.customerId,
-      active: true,
-    })
-    .returning({ id: account.id })
+  // Create Supabase Auth user via invite
+  const redirectTo = `${process.env.APP_URL}/auth/setup-password`
 
-  return c.json(newAccount, 201)
+  const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+    input.email,
+    {
+      redirectTo,
+      data: {
+        first_name: input.firstName,
+        last_name: input.lastName,
+      },
+    }
+  )
+
+  if (error || !data?.user) {
+    // Common cause: email already in auth.users (e.g., abandoned invite earlier)
+    return c.json(
+      {
+        error: `Failed to send invite: ${error?.message ?? "unknown error"}`,
+      },
+      500
+    )
+  }
+
+  const authUserId = data.user.id
+
+  // Now create account row with matching UUID
+  try {
+    const [newAccount] = await db
+      .insert(account)
+      .values({
+        id: authUserId,
+        accountTypeId: input.accountTypeId,
+        email: input.email,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        contactNumber: input.contactNumber,
+        manageAll: input.manageAll,
+        customerId: input.customerId,
+        active: true,
+      })
+      .returning({ id: account.id })
+
+    return c.json({ ...newAccount, inviteSent: true, email: input.email }, 201)
+  } catch (dbErr) {
+    // Rollback: if account insert fails, delete the auth user
+    await supabaseAdmin.auth.admin.deleteUser(authUserId)
+    return c.json(
+      {
+        error: `Failed to create account: ${dbErr instanceof Error ? dbErr.message : "unknown"}`,
+      },
+      500
+    )
+  }
 })
 
 // ─────────────────────────────────────────────────────────
