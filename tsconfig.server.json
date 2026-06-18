@@ -5,6 +5,7 @@
     "moduleResolution": "NodeNext",
     "rootDir": ".",
     "outDir": ".",
+    "noEmit": true,
     "skipLibCheck": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,

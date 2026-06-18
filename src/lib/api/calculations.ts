@@ -40,6 +40,5 @@ export const calculationsApi = {
   update: (id: number, input: UpdateCalculationInput) =>
     api.post<{ ok: true }>(`/calculations/${id}`, input),
 
-  delete: (id: number) =>
-    api.delete<{ ok: true }>(`/calculations/${id}`),
+  delete: (id: number) => api.delete<{ ok: true }>(`/calculations/${id}`),
 }
