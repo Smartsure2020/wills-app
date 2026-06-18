@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/form"
 import { supabase } from "@/lib/supabase"
 import { useSession } from "@/lib/providers"
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router"
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -134,8 +135,16 @@ function LoginPage() {
                   </>
                 )}
               </Button>
-            </form>
+                          </form>
           </Form>
+<div className="text-center">
+  <Link
+    to="/auth/forgot-password"
+    className="text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+  >
+    Forgot password?
+  </Link>
+</div>
 
           <p className="text-xs text-muted-foreground text-center mt-6">
             Initial password is{" "}
