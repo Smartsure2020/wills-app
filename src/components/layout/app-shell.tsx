@@ -2,7 +2,9 @@ import { Link } from "@tanstack/react-router"
 import { useAuth } from "@/lib/providers"
 import { cn } from "@/lib/utils"
 import type { ReactNode } from "react"
-import { Home, Users, UserCog, FileText, ListChecks, Mail, Settings } from "lucide-react"
+import { Home, Users, UserCog, FileText, ListChecks, Mail, Settings, LogOut } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { supabase } from "@/lib/supabase"
 
 type NavItem = {
   to: string
@@ -72,6 +74,14 @@ export function AppShell({ children }: { children: ReactNode }) {
             {user.firstName[0]?.toUpperCase()}
             {user.lastName[0]?.toUpperCase()}
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => supabase.auth.signOut()}
+            title="Sign out"
+          >
+            <LogOut className="h-4 w-4" />
+          </Button>
         </header>
 
         {/* Content */}

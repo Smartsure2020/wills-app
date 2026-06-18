@@ -1,4 +1,4 @@
-import { createRootRoute, Outlet, Link } from "@tanstack/react-router"
+import { createRootRoute, Outlet, Link, useRouterState } from "@tanstack/react-router"
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools"
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools"
 import { AppProviders } from "@/lib/providers"
@@ -11,11 +11,18 @@ export const Route = createRootRoute({
 })
 
 function RootLayout() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const isLoginRoute = pathname === "/login"
+
   return (
     <AppProviders>
-      <AppShell>
+      {isLoginRoute ? (
         <Outlet />
-      </AppShell>
+      ) : (
+        <AppShell>
+          <Outlet />
+        </AppShell>
+      )}
       <TanStackRouterDevtools position="bottom-right" />
       <ReactQueryDevtools buttonPosition="bottom-left" />
     </AppProviders>
@@ -27,7 +34,7 @@ function NotFound() {
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
       <h1 className="text-5xl font-bold tracking-tight">404</h1>
       <p className="text-muted-foreground mt-2 max-w-md">
-        This page doesn't exist yet. It might be coming in a later phase.
+        This page doesn't exist.
       </p>
       <Button asChild className="mt-6">
         <Link to="/">Back to dashboard</Link>

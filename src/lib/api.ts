@@ -1,8 +1,6 @@
-const API_BASE = "/api"
+import { supabase } from "./supabase"
 
-// Stub auth identifier — pointed at the dev admin account.
-// Will be replaced with a real Supabase JWT in a later phase.
-const DEV_USER_ID = "00000000-0000-0000-0000-000000000001"
+const API_BASE = "/api"
 
 export class ApiError extends Error {
   status: number
@@ -16,15 +14,24 @@ export class ApiError extends Error {
   }
 }
 
+async function getAuthToken(): Promise<string | null> {
+  const { data } = await supabase.auth.getSession()
+  return data.session?.access_token ?? null
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      "X-Dev-User-Id": DEV_USER_ID,
-      ...init?.headers,
-    },
-  })
+  const token = await getAuthToken()
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...((init?.headers as Record<string, string>) ?? {}),
+  }
+
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`
+  }
+
+  const res = await fetch(`${API_BASE}${path}`, { ...init, headers })
 
   if (!res.ok) {
     let body: unknown = null

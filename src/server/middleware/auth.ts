@@ -1,49 +1,77 @@
-import { createMiddleware } from "hono/factory"
+import type { Context, MiddlewareHandler } from "hono"
+import { jwtVerify } from "jose"
 import { eq } from "drizzle-orm"
 import { db } from "../../db/index.js"
 import { account } from "../../db/schema.js"
 import type { AppEnv, AppUser } from "../types.js"
 
-/**
- * Stub auth middleware for development.
- *
- * Reads X-Dev-User-Id header if present, otherwise falls back to the
- * default dev account. Loads the full Account row and attaches it to
- * the Hono context as `user`.
- *
- * Will be replaced with real Supabase JWT validation in a later phase —
- * the contract (c.set("user", ...)) stays identical so downstream
- * handlers don't change.
- */
+const JWT_SECRET = process.env.SUPABASE_JWT_SECRET
 
-const DEFAULT_DEV_USER_ID = "00000000-0000-0000-0000-000000000001"
+if (!JWT_SECRET) {
+  throw new Error("SUPABASE_JWT_SECRET must be set")
+}
 
-export const auth = createMiddleware<AppEnv>(async (c, next) => {
-  const userId = c.req.header("x-dev-user-id") ?? DEFAULT_DEV_USER_ID
+const secretKey = new TextEncoder().encode(JWT_SECRET)
 
-  const [user] = await db
-    .select({
-      id: account.id,
-      accountTypeId: account.accountTypeId,
-      email: account.email,
-      firstName: account.firstName,
-      lastName: account.lastName,
-      manageAll: account.manageAll,
+export const auth: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const authHeader = c.req.header("Authorization")
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return c.json({ error: "Missing or invalid authorization header" }, 401)
+  }
+
+  const token = authHeader.slice("Bearer ".length).trim()
+
+  let userId: string
+  try {
+    const { payload } = await jwtVerify(token, secretKey, {
+      audience: "authenticated",
     })
-    .from(account)
-    .where(eq(account.id, userId))
-    .limit(1)
 
-  if (!user) {
+    if (!payload.sub) {
+      return c.json({ error: "Token missing subject" }, 401)
+    }
+
+    userId = payload.sub
+  } catch (err) {
     return c.json(
       {
-        error: "Unauthorized",
-        message: `No account found for id ${userId}. Create the default dev account or set X-Dev-User-Id header.`,
+        error: "Invalid token",
+        detail: err instanceof Error ? err.message : "unknown",
       },
       401
     )
   }
 
-  c.set("user", { ...user, customerId: null } as AppUser)
+  const [row] = await db
+    .select({
+      id: account.id,
+      accountTypeId: account.accountTypeId,
+      customerId: account.customerId,
+      email: account.email,
+      firstName: account.firstName,
+      lastName: account.lastName,
+      manageAll: account.manageAll,
+      active: account.active,
+    })
+    .from(account)
+    .where(eq(account.id, userId))
+    .limit(1)
+
+  if (!row || !row.active) {
+    return c.json({ error: "Account not found or inactive" }, 401)
+  }
+
+  const user: AppUser = {
+    id: row.id,
+    accountTypeId: row.accountTypeId,
+    customerId: row.customerId,
+    email: row.email,
+    firstName: row.firstName,
+    lastName: row.lastName,
+    manageAll: row.manageAll,
+  }
+
+  c.set("user", user)
   await next()
-})
+}
