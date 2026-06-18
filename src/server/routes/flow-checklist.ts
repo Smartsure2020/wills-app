@@ -73,15 +73,20 @@ async function syncFlowItems(flowControlId: number, flowTypeId: number) {
 
   if (missing.length === 0) return
 
-  await db.insert(flowItem).values(
-    missing.map((m) => ({
-      flowControlId,
-      flowControlItemId: m.id,
-      applicable: true,
-      notes: "",
-      orderBy: m.orderBy,
-    }))
-  )
+  await db
+    .insert(flowItem)
+    .values(
+      missing.map((m) => ({
+        flowControlId,
+        flowControlItemId: m.id,
+        applicable: true,
+        notes: "",
+        orderBy: m.orderBy,
+      }))
+    )
+    .onConflictDoNothing({
+      target: [flowItem.flowControlId, flowItem.flowControlItemId],
+    })
 }
 
 // When an item is checked complete, look up its abbreviation and queue an email
@@ -244,6 +249,7 @@ flowChecklistRoute.post("/items/:id", zValidator("json", updateItemSchema), asyn
     .select({
       itemId: flowItem.id,
       customerId: flowControl.customerId,
+      checkedDate: flowItem.checkedDate,
     })
     .from(flowItem)
     .innerJoin(flowControl, eq(flowItem.flowControlId, flowControl.id))
@@ -257,7 +263,10 @@ flowChecklistRoute.post("/items/:id", zValidator("json", updateItemSchema), asyn
 
   const updates: Record<string, unknown> = {}
 
-  if (input.checked === true) {
+  const shouldQueueEmail =
+    input.checked === true && row.checkedDate === null && input.applicable !== false
+
+  if (input.checked === true && row.checkedDate === null) {
     updates.checkedDate = new Date()
     updates.checkedBy = user.id
   } else if (input.checked === false) {
@@ -284,7 +293,7 @@ flowChecklistRoute.post("/items/:id", zValidator("json", updateItemSchema), asyn
   await db.update(flowItem).set(updates).where(eq(flowItem.id, id))
 
   // Queue email if item just transitioned to checked
-  if (input.checked === true) {
+  if (shouldQueueEmail) {
     await queueEmailIfTemplateExists(id)
   }
 

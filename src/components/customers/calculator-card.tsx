@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { Plus, Trash2, Loader2, Calculator as CalcIcon } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -204,7 +204,11 @@ function ItemSection({
       ) : (
         <div className="border rounded-md divide-y">
           {items.map((item) => (
-            <ItemRow key={item.id} item={item} customerId={customerId} />
+            <ItemRow
+              key={`${item.id}:${item.description}:${item.value}`}
+              item={item}
+              customerId={customerId}
+            />
           ))}
           <div className="flex items-center justify-between py-2 px-3 bg-muted/30">
             <span className="text-xs font-medium text-muted-foreground">
@@ -233,12 +237,6 @@ function ItemRow({
 }) {
   const [description, setDescription] = useState(item.description)
   const [value, setValue] = useState(item.value)
-
-  // Re-sync local state if the row updates externally (e.g. cache invalidation)
-  useEffect(() => {
-    setDescription(item.description)
-    setValue(item.value)
-  }, [item.description, item.value])
 
   const updateMutation = useMutation({
     mutationFn: (changes: { description?: string; value?: number }) =>

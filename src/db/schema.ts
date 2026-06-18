@@ -12,6 +12,7 @@ import {
   date,
   uuid,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core"
 import { relations } from "drizzle-orm"
 
@@ -138,6 +139,7 @@ export const customerRelation = pgTable(
   },
   (t) => ({
     customerIdx: index("customer_relation_customer_idx").on(t.customerId),
+    relationIdx: index("customer_relation_relation_idx").on(t.relationId),
   })
 )
 
@@ -224,6 +226,11 @@ export const flowItem = pgTable(
   },
   (t) => ({
     controlIdx: index("flow_item_control_idx").on(t.flowControlId),
+    controlItemIdx: index("flow_item_control_item_idx").on(t.flowControlItemId),
+    controlItemUniqueIdx: uniqueIndex("flow_item_control_item_unique_idx").on(
+      t.flowControlId,
+      t.flowControlItemId
+    ),
   })
 )
 
@@ -254,21 +261,34 @@ export const document = pgTable(
   })
 )
 
-export const documentTemplate = pgTable("document_template", {
-  id: bigserial("id", { mode: "number" }).primaryKey(),
-  parentId: bigint("parent_id", { mode: "number" }).notNull().default(0),
-  documentName: varchar("document_name", { length: 500 }).notNull(),
-  isFolder: boolean("is_folder").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  createdBy: uuid("created_by").references(() => account.id),
-  deletedAt: timestamp("deleted_at"),
-})
+export const documentTemplate = pgTable(
+  "document_template",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    parentId: bigint("parent_id", { mode: "number" }).notNull().default(0),
+    documentName: varchar("document_name", { length: 500 }).notNull(),
+    isFolder: boolean("is_folder").notNull().default(true),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    createdBy: uuid("created_by").references(() => account.id),
+    deletedAt: timestamp("deleted_at"),
+  },
+  (t) => ({
+    parentIdx: index("document_template_parent_idx").on(t.parentId),
+  })
+)
 
-export const flowItemDocument = pgTable("flow_item_document", {
-  id: serial("id").primaryKey(),
-  flowItemId: integer("flow_item_id").notNull().references(() => flowItem.id),
-  documentId: bigint("document_id", { mode: "number" }).notNull().references(() => document.id),
-})
+export const flowItemDocument = pgTable(
+  "flow_item_document",
+  {
+    id: serial("id").primaryKey(),
+    flowItemId: integer("flow_item_id").notNull().references(() => flowItem.id),
+    documentId: bigint("document_id", { mode: "number" }).notNull().references(() => document.id),
+  },
+  (t) => ({
+    flowItemIdx: index("flow_item_document_flow_item_idx").on(t.flowItemId),
+    documentIdx: index("flow_item_document_document_idx").on(t.documentId),
+  })
+)
 
 // ─────────────────────────────────────────────────────────
 // CALCULATIONS — Estate Value
@@ -287,6 +307,7 @@ export const calculationItem = pgTable(
   },
   (t) => ({
     customerIdx: index("calculation_item_customer_idx").on(t.customerId),
+    typeIdx: index("calculation_item_type_idx").on(t.calculationItemTypeId),
   })
 )
 
@@ -310,6 +331,7 @@ export const mail = pgTable(
   (t) => ({
     createdAtIdx: index("mail_created_at_idx").on(t.createdAt),
     sentAtIdx: index("mail_sent_at_idx").on(t.sentAt),
+    customerIdx: index("mail_customer_idx").on(t.customerId),
   })
 )
 

@@ -34,7 +34,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers })
 
   if (!res.ok) {
-    let body: unknown = null
+    let body: unknown
     try {
       body = await res.json()
     } catch {

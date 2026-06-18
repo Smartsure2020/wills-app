@@ -102,6 +102,10 @@ export const customersRoute = new Hono<AppEnv>()
 // All customer routes require an authenticated user
 customersRoute.use("*", auth)
 
+function canManageCustomers(user: { accountTypeId: number; manageAll: boolean }): boolean {
+  return user.accountTypeId === 1 || user.manageAll
+}
+
 // ─────────────────────────────────────────────────────────
 // GET /api/customers — paginated list with filters
 // ─────────────────────────────────────────────────────────
@@ -303,6 +307,10 @@ customersRoute.post("/", zValidator("json", customerCreateSchema), async (c) => 
   const input = c.req.valid("json")
   const user = c.get("user")
 
+  if (user.accountTypeId !== 1 && input.assignedTo !== user.id) {
+    return c.json({ error: "Brokers can only assign new customers to themselves" }, 403)
+  }
+
   // Verify the assigned broker exists and is actually a broker
   const [broker] = await db
     .select({ id: account.id, accountTypeId: account.accountTypeId, active: account.active })
@@ -434,7 +442,7 @@ customersRoute.post("/", zValidator("json", customerCreateSchema), async (c) => 
     return c.json({ id: newCustomerId }, 201)
   } catch (err) {
     console.error("[customers.create]", err)
-    return c.json({ error: "Failed to create customer", message: String(err) }, 500)
+    return c.json({ error: "Internal error" }, 500)
   }
 })
 
@@ -450,7 +458,17 @@ customersRoute.post("/:id/assign-broker", zValidator("json", assignBrokerSchema)
   const user = c.get("user")
 
   // Permission: only admin or ManageAll broker can reassign
-  if (!user.manageAll) return c.json({ error: "Forbidden" }, 403)
+  if (!canManageCustomers(user)) return c.json({ error: "Forbidden" }, 403)
+
+  const [existingCustomer] = await db
+    .select({ id: customer.id })
+    .from(customer)
+    .where(and(eq(customer.id, id), isNull(customer.deletedAt)))
+    .limit(1)
+
+  if (!existingCustomer) {
+    return c.json({ error: "Customer not found" }, 404)
+  }
 
   // Confirm the new broker is valid
   const [newBroker] = await db
@@ -481,6 +499,6 @@ customersRoute.post("/:id/assign-broker", zValidator("json", assignBrokerSchema)
     return c.json({ ok: true })
   } catch (err) {
     console.error("[customers.assign-broker]", err)
-    return c.json({ error: "Failed to reassign", message: String(err) }, 500)
+    return c.json({ error: "Internal error" }, 500)
   }
 })

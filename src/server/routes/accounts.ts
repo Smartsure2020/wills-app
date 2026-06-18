@@ -46,9 +46,10 @@ export const accountsRoute = new Hono<AppEnv>()
 
 accountsRoute.use("*", auth)
 
-// Helper: can this user manage other accounts?
-function canManage(user: { manageAll: boolean; accountTypeId: number }): boolean {
-  return user.manageAll || user.accountTypeId === 1 // Admin or ManageAll broker
+// Helper: account administration is admin-only. Brokers must not be able to
+// enumerate or manage other broker accounts.
+function canManageAccounts(user: { accountTypeId: number }): boolean {
+  return user.accountTypeId === 1
 }
 
 // ─────────────────────────────────────────────────────────
@@ -65,6 +66,11 @@ accountsRoute.get("/me", async (c) => {
 
 accountsRoute.get("/", zValidator("query", accountListSchema), async (c) => {
   const input = c.req.valid("query")
+  const user = c.get("user")
+
+  if (!canManageAccounts(user)) {
+    return c.json({ error: "Forbidden" }, 403)
+  }
 
   const conditions: SQL[] = [eq(account.active, true), isNull(account.deletedAt)]
 
@@ -118,6 +124,11 @@ accountsRoute.get("/", zValidator("query", accountListSchema), async (c) => {
 
 accountsRoute.get("/:id", async (c) => {
   const id = c.req.param("id")
+  const user = c.get("user")
+
+  if (user.id !== id && !canManageAccounts(user)) {
+    return c.json({ error: "Forbidden" }, 403)
+  }
 
   const [row] = await db
     .select({
@@ -153,7 +164,7 @@ accountsRoute.post("/", zValidator("json", accountCreateSchema), async (c) => {
   const input = c.req.valid("json")
   const user = c.get("user")
 
-  if (!canManage(user)) {
+  if (!canManageAccounts(user)) {
     return c.json({ error: "Forbidden" }, 403)
   }
 
@@ -189,12 +200,8 @@ accountsRoute.post("/", zValidator("json", accountCreateSchema), async (c) => {
 
   if (error || !data?.user) {
     // Common cause: email already in auth.users (e.g., abandoned invite earlier)
-    return c.json(
-      {
-        error: `Failed to send invite: ${error?.message ?? "unknown error"}`,
-      },
-      500
-    )
+    console.error("[accounts.create.invite]", error)
+    return c.json({ error: "Internal error" }, 500)
   }
 
   const authUserId = data.user.id
@@ -220,12 +227,8 @@ accountsRoute.post("/", zValidator("json", accountCreateSchema), async (c) => {
   } catch (dbErr) {
     // Rollback: if account insert fails, delete the auth user
     await supabaseAdmin.auth.admin.deleteUser(authUserId)
-    return c.json(
-      {
-        error: `Failed to create account: ${dbErr instanceof Error ? dbErr.message : "unknown"}`,
-      },
-      500
-    )
+    console.error("[accounts.create.db]", dbErr)
+    return c.json({ error: "Internal error" }, 500)
   }
 })
 
@@ -239,12 +242,12 @@ accountsRoute.post("/:id", zValidator("json", accountUpdateSchema), async (c) =>
   const user = c.get("user")
 
   // Users can update themselves; admins/ManageAll can update anyone
-  if (user.id !== id && !canManage(user)) {
+  if (user.id !== id && !canManageAccounts(user)) {
     return c.json({ error: "Forbidden" }, 403)
   }
 
   // Self-update restriction: regular users can't grant themselves manageAll
-  if (user.id === id && !canManage(user) && input.manageAll) {
+  if (user.id === id && !canManageAccounts(user) && input.manageAll) {
     return c.json({ error: "Cannot grant ManageAll to yourself" }, 403)
   }
 

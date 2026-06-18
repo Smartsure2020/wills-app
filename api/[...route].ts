@@ -1,8 +1,6 @@
 import { Hono } from "hono"
 import { handle } from "hono/vercel"
 import { cors } from "hono/cors"
-import { sql } from "drizzle-orm"
-import { db } from "../src/db/index.js"
 import type { AppEnv } from "../src/server/types.js"
 import { customersRoute } from "../src/server/routes/customers.js"
 import { accountsRoute } from "../src/server/routes/accounts.js"
@@ -19,14 +17,26 @@ export const config = { runtime: "nodejs" }
 
 const app = new Hono<AppEnv>().basePath("/api")
 
-// CORS — wide-open for now, tighten before launch
+const configuredOrigins = process.env.APP_URL ? [process.env.APP_URL.trim()] : []
+
+const devOrigins =
+  process.env.NODE_ENV === "production"
+    ? []
+    : ["http://localhost:3000", "http://localhost:5173"]
+
+const allowedOrigins = new Set([...configuredOrigins, ...devOrigins])
+
+// CORS is restricted to configured app origins in production.
 app.use(
   "/*",
   cors({
-    origin: "*",
-    allowHeaders: ["Content-Type", "Authorization", "X-Dev-User-Id"],
+    origin: (origin) => {
+      if (allowedOrigins.size === 0) return null
+      return allowedOrigins.has(origin) ? origin : null
+    },
+    allowHeaders: ["Content-Type", "Authorization"],
     allowMethods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    credentials: true,
+    credentials: false,
   })
 )
 
@@ -37,18 +47,9 @@ app.get("/health", (c) =>
     ok: true,
     ts: Date.now(),
     app: "wills-app",
-    phase: "2a",
+    phase: "production",
   })
 )
-
-app.get("/db-health", async (c) => {
-  try {
-    const result = await db.execute(sql`SELECT current_database() as db, version() as version`)
-    return c.json({ ok: true, result: result[0] })
-  } catch (err) {
-    return c.json({ ok: false, error: String(err) }, 500)
-  }
-})
 
 // ──── Authenticated routes (mounted in Phase 2b onwards) ────
 app.route("/customers", customersRoute)
@@ -70,7 +71,7 @@ app.notFound((c) =>
 
 app.onError((err, c) => {
   console.error("[api]", err)
-  return c.json({ error: "Internal error", message: String(err) }, 500)
+  return c.json({ error: "Internal error" }, 500)
 })
 
 const handler = handle(app)

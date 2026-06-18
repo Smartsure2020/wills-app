@@ -1,7 +1,7 @@
 import { Hono } from "hono"
 import { zValidator } from "@hono/zod-validator"
 import { z } from "zod"
-import { and, asc, eq } from "drizzle-orm"
+import { asc, eq } from "drizzle-orm"
 import { db } from "../../db/index.js"
 import {
   calculationItem,

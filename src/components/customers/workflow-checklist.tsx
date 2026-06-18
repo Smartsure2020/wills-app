@@ -436,8 +436,11 @@ function AttachDocumentDialog({
     },
   })
 
-  const files = data?.items ?? []
-  const attachedIds = new Set(item.attachments.map((a) => a.documentId))
+  const files = useMemo(() => data?.items ?? [], [data?.items])
+  const attachedIds = useMemo(
+    () => new Set(item.attachments.map((a) => a.documentId)),
+    [item.attachments]
+  )
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()

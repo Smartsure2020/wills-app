@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router"
-import { useForm, useFieldArray, useWatch, type Control } from "react-hook-form"
+import { useForm, useFieldArray, useWatch, type Control, type FieldPath } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useQuery, useMutation } from "@tanstack/react-query"
@@ -25,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useDropdowns } from "@/lib/providers"
+import { useAuth, useDropdowns } from "@/lib/providers"
 import { customersApi } from "@/lib/api/customers"
 import { accountsApi } from "@/lib/api/accounts"
 import { extractDateOfBirthFromSaId } from "@/lib/sa-id"
@@ -120,12 +120,20 @@ function AddCustomerPage() {
   const [step, setStep] = useState<1 | 2>(1)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const navigate = useNavigate()
+  const user = useAuth()
+  const canChooseBroker = user.accountTypeId === 1
 
   const form = useForm<CustomerFormData>({
     resolver: zodResolver(customerSchema),
     defaultValues,
     mode: "onTouched",
   })
+
+  useEffect(() => {
+    if (!canChooseBroker && form.getValues("assignedTo") !== user.id) {
+      form.setValue("assignedTo", user.id, { shouldValidate: true })
+    }
+  }, [canChooseBroker, form, user.id])
 
   // Watch idNumber and auto-fill dateOfBirth when 13 digits entered
   const idNumber = useWatch({ control: form.control, name: "idNumber" })
@@ -189,7 +197,11 @@ function AddCustomerPage() {
           }}
           className="space-y-6"
         >
-          {step === 1 ? <Step1 control={form.control} /> : <Step2 control={form.control} />}
+          {step === 1 ? (
+            <Step1 control={form.control} user={user} canChooseBroker={canChooseBroker} />
+          ) : (
+            <Step2 control={form.control} />
+          )}
 
           {submitError && (
             <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
@@ -240,15 +252,26 @@ function AddCustomerPage() {
 // Step 1 — Customer details
 // ─────────────────────────────────────────────────────────
 
-function Step1({ control }: { control: Control<CustomerFormData> }) {
+function Step1({
+  control,
+  user,
+  canChooseBroker,
+}: {
+  control: Control<CustomerFormData>
+  user: ReturnType<typeof useAuth>
+  canChooseBroker: boolean
+}) {
   const dropdowns = useDropdowns()
 
   // Fetch brokers for the assignment select
   const { data: brokersData } = useQuery({
     queryKey: ["accounts", { accountTypeId: 2, pageSize: 100 }],
     queryFn: () => accountsApi.list({ accountTypeId: 2, pageSize: 100 }),
+    enabled: canChooseBroker,
   })
-  const brokers = brokersData?.items ?? []
+  const brokers = canChooseBroker
+    ? (brokersData?.items ?? [])
+    : [{ id: user.id, firstName: user.firstName, lastName: user.lastName }]
 
   return (
     <div className="space-y-6">
@@ -263,7 +286,7 @@ function Step1({ control }: { control: Control<CustomerFormData> }) {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Broker</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
+                <Select onValueChange={field.onChange} value={field.value} disabled={!canChooseBroker}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a broker" />
@@ -652,7 +675,7 @@ function DropdownField({
   options,
 }: {
   control: Control<CustomerFormData>
-  name: any
+  name: FieldPath<CustomerFormData>
   label: string
   options: { id: number; description: string }[]
 }) {

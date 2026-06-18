@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TemplatesIndexRouteImport } from './routes/templates/index'
+import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as MailOutboxIndexRouteImport } from './routes/mail-outbox/index'
 import { Route as FlowItemsIndexRouteImport } from './routes/flow-items/index'
 import { Route as CustomersIndexRouteImport } from './routes/customers/index'
@@ -21,6 +22,8 @@ import { Route as CustomersCustomerIdRouteImport } from './routes/customers/$cus
 import { Route as BrokersNewRouteImport } from './routes/brokers/new'
 import { Route as BrokersBrokerIdRouteImport } from './routes/brokers/$brokerId'
 import { Route as AuthSetupPasswordRouteImport } from './routes/auth/setup-password'
+import { Route as AuthResetPasswordRouteImport } from './routes/auth/reset-password'
+import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-password'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -35,6 +38,11 @@ const IndexRoute = IndexRouteImport.update({
 const TemplatesIndexRoute = TemplatesIndexRouteImport.update({
   id: '/templates/',
   path: '/templates/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsIndexRoute = SettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MailOutboxIndexRoute = MailOutboxIndexRouteImport.update({
@@ -82,10 +90,22 @@ const AuthSetupPasswordRoute = AuthSetupPasswordRouteImport.update({
   path: '/auth/setup-password',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthResetPasswordRoute = AuthResetPasswordRouteImport.update({
+  id: '/auth/reset-password',
+  path: '/auth/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthForgotPasswordRoute = AuthForgotPasswordRouteImport.update({
+  id: '/auth/forgot-password',
+  path: '/auth/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/auth/forgot-password': typeof AuthForgotPasswordRoute
+  '/auth/reset-password': typeof AuthResetPasswordRoute
   '/auth/setup-password': typeof AuthSetupPasswordRoute
   '/brokers/$brokerId': typeof BrokersBrokerIdRoute
   '/brokers/new': typeof BrokersNewRoute
@@ -95,11 +115,14 @@ export interface FileRoutesByFullPath {
   '/customers/': typeof CustomersIndexRoute
   '/flow-items/': typeof FlowItemsIndexRoute
   '/mail-outbox/': typeof MailOutboxIndexRoute
+  '/settings/': typeof SettingsIndexRoute
   '/templates/': typeof TemplatesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/auth/forgot-password': typeof AuthForgotPasswordRoute
+  '/auth/reset-password': typeof AuthResetPasswordRoute
   '/auth/setup-password': typeof AuthSetupPasswordRoute
   '/brokers/$brokerId': typeof BrokersBrokerIdRoute
   '/brokers/new': typeof BrokersNewRoute
@@ -109,12 +132,15 @@ export interface FileRoutesByTo {
   '/customers': typeof CustomersIndexRoute
   '/flow-items': typeof FlowItemsIndexRoute
   '/mail-outbox': typeof MailOutboxIndexRoute
+  '/settings': typeof SettingsIndexRoute
   '/templates': typeof TemplatesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/auth/forgot-password': typeof AuthForgotPasswordRoute
+  '/auth/reset-password': typeof AuthResetPasswordRoute
   '/auth/setup-password': typeof AuthSetupPasswordRoute
   '/brokers/$brokerId': typeof BrokersBrokerIdRoute
   '/brokers/new': typeof BrokersNewRoute
@@ -124,6 +150,7 @@ export interface FileRoutesById {
   '/customers/': typeof CustomersIndexRoute
   '/flow-items/': typeof FlowItemsIndexRoute
   '/mail-outbox/': typeof MailOutboxIndexRoute
+  '/settings/': typeof SettingsIndexRoute
   '/templates/': typeof TemplatesIndexRoute
 }
 export interface FileRouteTypes {
@@ -131,6 +158,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/auth/forgot-password'
+    | '/auth/reset-password'
     | '/auth/setup-password'
     | '/brokers/$brokerId'
     | '/brokers/new'
@@ -140,11 +169,14 @@ export interface FileRouteTypes {
     | '/customers/'
     | '/flow-items/'
     | '/mail-outbox/'
+    | '/settings/'
     | '/templates/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
+    | '/auth/forgot-password'
+    | '/auth/reset-password'
     | '/auth/setup-password'
     | '/brokers/$brokerId'
     | '/brokers/new'
@@ -154,11 +186,14 @@ export interface FileRouteTypes {
     | '/customers'
     | '/flow-items'
     | '/mail-outbox'
+    | '/settings'
     | '/templates'
   id:
     | '__root__'
     | '/'
     | '/login'
+    | '/auth/forgot-password'
+    | '/auth/reset-password'
     | '/auth/setup-password'
     | '/brokers/$brokerId'
     | '/brokers/new'
@@ -168,12 +203,15 @@ export interface FileRouteTypes {
     | '/customers/'
     | '/flow-items/'
     | '/mail-outbox/'
+    | '/settings/'
     | '/templates/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
+  AuthForgotPasswordRoute: typeof AuthForgotPasswordRoute
+  AuthResetPasswordRoute: typeof AuthResetPasswordRoute
   AuthSetupPasswordRoute: typeof AuthSetupPasswordRoute
   BrokersBrokerIdRoute: typeof BrokersBrokerIdRoute
   BrokersNewRoute: typeof BrokersNewRoute
@@ -183,6 +221,7 @@ export interface RootRouteChildren {
   CustomersIndexRoute: typeof CustomersIndexRoute
   FlowItemsIndexRoute: typeof FlowItemsIndexRoute
   MailOutboxIndexRoute: typeof MailOutboxIndexRoute
+  SettingsIndexRoute: typeof SettingsIndexRoute
   TemplatesIndexRoute: typeof TemplatesIndexRoute
 }
 
@@ -207,6 +246,13 @@ declare module '@tanstack/react-router' {
       path: '/templates'
       fullPath: '/templates/'
       preLoaderRoute: typeof TemplatesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/': {
+      id: '/settings/'
+      path: '/settings'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof SettingsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mail-outbox/': {
@@ -272,12 +318,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthSetupPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/reset-password': {
+      id: '/auth/reset-password'
+      path: '/auth/reset-password'
+      fullPath: '/auth/reset-password'
+      preLoaderRoute: typeof AuthResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/forgot-password': {
+      id: '/auth/forgot-password'
+      path: '/auth/forgot-password'
+      fullPath: '/auth/forgot-password'
+      preLoaderRoute: typeof AuthForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
+  AuthForgotPasswordRoute: AuthForgotPasswordRoute,
+  AuthResetPasswordRoute: AuthResetPasswordRoute,
   AuthSetupPasswordRoute: AuthSetupPasswordRoute,
   BrokersBrokerIdRoute: BrokersBrokerIdRoute,
   BrokersNewRoute: BrokersNewRoute,
@@ -287,6 +349,7 @@ const rootRouteChildren: RootRouteChildren = {
   CustomersIndexRoute: CustomersIndexRoute,
   FlowItemsIndexRoute: FlowItemsIndexRoute,
   MailOutboxIndexRoute: MailOutboxIndexRoute,
+  SettingsIndexRoute: SettingsIndexRoute,
   TemplatesIndexRoute: TemplatesIndexRoute,
 }
 export const routeTree = rootRouteImport

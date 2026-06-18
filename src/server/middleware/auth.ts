@@ -1,4 +1,4 @@
-import type { Context, MiddlewareHandler } from "hono"
+import type { MiddlewareHandler } from "hono"
 import { jwtVerify } from "jose"
 import { eq } from "drizzle-orm"
 import { db } from "../../db/index.js"
@@ -34,13 +34,8 @@ export const auth: MiddlewareHandler<AppEnv> = async (c, next) => {
 
     userId = payload.sub
   } catch (err) {
-    return c.json(
-      {
-        error: "Invalid token",
-        detail: err instanceof Error ? err.message : "unknown",
-      },
-      401
-    )
+    console.error("[auth.invalid-token]", err)
+    return c.json({ error: "Invalid token" }, 401)
   }
 
   const [row] = await db

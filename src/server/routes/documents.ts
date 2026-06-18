@@ -9,6 +9,12 @@ import { auth } from "../middleware/auth.js"
 import { supabaseAdmin, DOCUMENTS_BUCKET } from "../lib/supabase.js"
 import type { AppEnv, AppUser } from "../types.js"
 
+type BreadcrumbRow = {
+  id: number | string
+  parent_id: number | string
+  document_name: string
+}
+
 // ─────────────────────────────────────────────────────────
 // Schemas
 // ─────────────────────────────────────────────────────────
@@ -180,7 +186,7 @@ documentsRoute.get("/", zValidator("query", listSchema), async (c) => {
       FROM folder_path
       ORDER BY depth DESC
     `)
-    breadcrumbs = (result as any[]).map((row: any) => ({
+    breadcrumbs = (result as unknown as BreadcrumbRow[]).map((row) => ({
       id: Number(row.id),
       parentId: Number(row.parent_id),
       documentName: row.document_name,
@@ -288,7 +294,8 @@ documentsRoute.post("/upload-url", zValidator("json", uploadUrlSchema), async (c
 
   if (error || !data) {
     await db.delete(document).where(eq(document.id, doc.id))
-    return c.json({ error: `Failed to create upload URL: ${error?.message ?? "unknown"}` }, 500)
+    console.error("[documents.upload-url]", error)
+    return c.json({ error: "Internal error" }, 500)
   }
 
   return c.json({
@@ -327,7 +334,8 @@ documentsRoute.get("/:id/download-url", async (c) => {
     .createSignedUrl(doc.path, 60 * 60, { download: doc.documentName })
 
   if (error || !data) {
-    return c.json({ error: `Failed to create download URL: ${error?.message ?? "unknown"}` }, 500)
+    console.error("[documents.download-url]", error)
+    return c.json({ error: "Internal error" }, 500)
   }
 
   return c.json({
@@ -389,7 +397,7 @@ documentsRoute.post("/:id/move", zValidator("json", moveSchema), async (c) => {
         )
         SELECT 1 FROM descendants WHERE id = ${newParentId} LIMIT 1
       `)
-      if ((cycleCheck as any[]).length > 0) {
+      if ((cycleCheck as unknown[]).length > 0) {
         return c.json({ error: "Cannot move a folder into its own descendant" }, 400)
       }
     }

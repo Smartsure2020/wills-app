@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/form"
 import { supabase } from "@/lib/supabase"
 import { useSession } from "@/lib/providers"
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router"
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,

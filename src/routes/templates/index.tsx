@@ -40,10 +40,9 @@ function TemplatesPage() {
     enabled: user.accountTypeId === 1 || user.manageAll,
   })
 
-  const items = data?.items ?? []
-
   // Build a parent → children map for tree rendering
   const childMap = useMemo(() => {
+    const items = data?.items ?? []
     const map = new Map<number, DocumentTemplateItem[]>()
     for (const item of items) {
       const arr = map.get(item.parentId) ?? []
@@ -55,7 +54,7 @@ function TemplatesPage() {
       arr.sort((a, b) => a.documentName.localeCompare(b.documentName))
     }
     return map
-  }, [items])
+  }, [data?.items])
 
   // Admin gate on the client side too
   if (user.accountTypeId !== 1 && !user.manageAll) {

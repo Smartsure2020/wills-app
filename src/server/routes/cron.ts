@@ -27,7 +27,6 @@ cronRoute.get("/send-mail", async (c) => {
 
   let sent = 0
   let failed = 0
-  const errors: string[] = []
 
   for (const m of pending) {
     try {
@@ -45,7 +44,7 @@ cronRoute.get("/send-mail", async (c) => {
       sent++
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error"
-      errors.push(`mail ${m.id}: ${message}`)
+      console.error("[cron.send-mail]", `mail ${m.id}: ${message}`)
 
       await db
         .update(mail)
@@ -63,6 +62,5 @@ cronRoute.get("/send-mail", async (c) => {
     processed: pending.length,
     sent,
     failed,
-    errors: errors.length > 0 ? errors : undefined,
   })
 })
