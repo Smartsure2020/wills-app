@@ -25,6 +25,7 @@ import { customersApi, type CustomerDetail } from "@/lib/api/customers"
 import { formatDate, formatMoney } from "@/lib/format"
 import { DocumentsCard } from "@/components/customers/documents-card"
 import { WorkflowChecklist } from "@/components/customers/workflow-checklist"
+import { CalculatorCard } from "@/components/customers/calculator-card"
 
 const searchSchema = z.object({
   folder: z.coerce.number().int().min(0).default(0),
@@ -238,6 +239,7 @@ function CustomerProfile({ customer }: { customer: CustomerDetail }) {
       />
 
       <WorkflowChecklist customerId={customer.id} />
+      <CalculatorCard customerId={customer.id} />
     </div>
   )
 }
