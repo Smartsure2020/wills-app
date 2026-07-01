@@ -17,6 +17,10 @@ export default defineConfig({
   },
   server: {
     proxy: {
+      // Local UI requests to /api are proxied to the deployed Vercel API.
+      // This is convenient for manual testing, but it means local actions can
+      // read or mutate remote state. Point this at a local API runner before
+      // doing destructive local QA or seed-data experiments.
       "/api": {
         target: "https://wills-app-sage.vercel.app",
         changeOrigin: true,
